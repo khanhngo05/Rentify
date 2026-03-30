@@ -1,7 +1,7 @@
-# 🗄️ Thiết kế CSDL — Ứng dụng Cho Thuê Trang Phục Đa Chi Nhánh
+# 🗄️ Thiết kế CSDL — Rentify: Ứng dụng Cho Thuê Trang Phục Đa Chi Nhánh
 
 > **Môn:** Phát Triển Ứng Dụng Thiết Bị Di Động  
-> **Đề tài:** Xây dựng ứng dụng cho thuê trang phục trực tuyến trên thiết bị di động  
+> **Đề tài:** Xây dựng ứng dụng Rentify — cho thuê trang phục trực tuyến trên thiết bị di động  
 > **Lớp:** 65CNTT — Trường Đại học Thủy Lợi  
 > **Công nghệ:** Flutter · Firebase Firestore · Supabase Storage  
 > **Phiên bản:** 2.0 — Hỗ trợ đa chi nhánh + GPS
@@ -48,7 +48,7 @@
    │    Firebase Firestore    │   │      Supabase Storage        │
    │   (Dữ liệu cấu trúc)    │   │        (Hình ảnh)            │
    │                          │   │                              │
-   │  ├── users               │   │  bucket: fashion-images/     │
+   │  ├── users               │   │  bucket: rentify-images/     │
    │  ├── branches ◄── GPS    │   │  ├── branches/{branchId}/    │
    │  │   └── inventory/      │   │  ├── products/{productId}/   │
    │  ├── products            │   │  ├── reviews/{reviewId}/     │
@@ -162,7 +162,7 @@
   "email": "khach@example.com",
   "displayName": "Trần Thị Bích",
   "phoneNumber": "0901234567",
-  "avatarUrl": "https://<project>.supabase.co/storage/v1/object/public/fashion-images/avatars/user_003.jpg",
+  "avatarUrl": "https://<project>.supabase.co/storage/v1/object/public/rentify-images/avatars/user_003.jpg",
   "address": "78 Trường Chinh, Đống Đa, Hà Nội",
   "role": "user",
   "createdAt": "2026-02-01T10:00:00Z"
@@ -204,12 +204,12 @@
 ```json
 {
   "name": "Chi nhánh Đống Đa",
-  "address": "15 Phố Huế, Hai Bà Trưng, Hà Nội",
+  "address": "158 Đường Lê Duẩn, Khâm Thiên, Văn Miếu - Quốc Tử Giám, Hà Nội",
   "location": { "latitude": 21.0178, "longitude": 105.8412 },
   "geohash": "w3gv2e",
   "phone": "024.3825.1234",
-  "email": "dongda@fashionrental.vn",
-  "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/fashion-images/branches/branch_001/store.jpg",
+  "email": "dongda@rentify.vn",
+  "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/rentify-images/branches/branch_001/store.jpg",
   "openingHours": {
     "monday":  { "open": "08:00", "close": "21:00", "isOpen": true },
     "sunday":  { "open": "09:00", "close": "20:00", "isOpen": true }
@@ -291,7 +291,7 @@ Admin tạo sản phẩm một lần, tất cả chi nhánh dùng chung catalog.
   "description": "Áo dài gấm đỏ truyền thống, thêu hoa phượng tinh xảo. Phù hợp Tết, đám hỏi, lễ hội.",
   "rentalPricePerDay": 250000,
   "depositAmount": 1000000,
-  "thumbnailUrl": "https://<project>.supabase.co/storage/v1/object/public/fashion-images/products/prod_001/main.jpg",
+  "thumbnailUrl": "https://<project>.supabase.co/storage/v1/object/public/rentify-images/products/prod_001/main.jpg",
   "imageUrls": ["...img_1.jpg", "...img_2.jpg"],
   "category": "ao_dai",
   "sizes": ["S", "M", "L"],
@@ -390,10 +390,10 @@ Admin tạo sản phẩm một lần, tất cả chi nhánh dùng chung catalog.
 
 ## 4. Supabase Storage
 
-### Bucket: `fashion-images` (Public)
+### Bucket: `rentify-images` (Public)
 
 ```
-fashion-images/
+rentify-images/
 ├── branches/
 │   └── {branchId}/
 │       └── store.jpg           ← Ảnh mặt tiền cửa hàng
@@ -577,7 +577,7 @@ service cloud.firestore {
 | Đơn thuê | Firestore `orders` | Liên kết user + **chi nhánh** + sản phẩm |
 | Đánh giá | Firestore `reviews` | Điểm, nhận xét, ảnh camera |
 | Yêu thích | Firestore `favorites/{uid}/items` | Danh sách riêng từng user |
-| Ảnh cửa hàng | Supabase `fashion-images/branches/` | Hình chi nhánh |
-| Ảnh sản phẩm | Supabase `fashion-images/products/` | Nhiều ảnh/sản phẩm |
-| Ảnh đánh giá | Supabase `fashion-images/reviews/` | Ảnh thực tế chụp từ camera |
-| Ảnh đại diện | Supabase `fashion-images/avatars/` | Avatar người dùng |
+| Ảnh cửa hàng | Supabase `rentify-images/branches/` | Hình chi nhánh |
+| Ảnh sản phẩm | Supabase `rentify-images/products/` | Nhiều ảnh/sản phẩm |
+| Ảnh đánh giá | Supabase `rentify-images/reviews/` | Ảnh thực tế chụp từ camera |
+| Ảnh đại diện | Supabase `rentify-images/avatars/` | Avatar người dùng |
