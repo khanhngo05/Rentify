@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "22071167419",
+    "project_id": "rentify-b6e51",
+    "storage_bucket": "rentify-b6e51.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22071167419:android:558147854fbe4b79211c9e",
+        "android_client_info": {
+          "package_name": "com.rentify.rentify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE6ZF3g57BO3FCcT-C6vun9km94YdOMWs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
