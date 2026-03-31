@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../models/product_model.dart';
@@ -35,30 +34,7 @@ class ProductCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   // Ảnh
-                  CachedNetworkImage(
-                    imageUrl: product.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: AppColors.shimmerBase,
-                      child: const Center(
-                        child: Icon(
-                          Icons.checkroom_rounded,
-                          color: AppColors.textHint,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: AppColors.shimmerBase,
-                      child: const Center(
-                        child: Icon(
-                          Icons.broken_image_rounded,
-                          color: AppColors.textHint,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                  ),
+                  _ProductImage(product: product),
 
                   // Nút yêu thích ❤️
                   Positioned(
@@ -177,6 +153,152 @@ class ProductCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductImage extends StatefulWidget {
+  const _ProductImage({required this.product});
+
+  final Product product;
+
+  @override
+  State<_ProductImage> createState() => _ProductImageState();
+}
+
+class _ProductImageState extends State<_ProductImage> {
+  late List<String> _candidates;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _candidates = _buildCandidates(widget.product);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProductImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id ||
+        oldWidget.product.thumbnailUrl != widget.product.thumbnailUrl ||
+        oldWidget.product.imageUrls != widget.product.imageUrls) {
+      _candidates = _buildCandidates(widget.product);
+      _currentIndex = 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_candidates.isEmpty) {
+      return _buildImageError();
+    }
+
+    final imageUrl = _candidates[_currentIndex];
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return _buildImagePlaceholder();
+      },
+      errorBuilder: (_, __, ___) {
+        _tryNextImage();
+        return _buildImageError();
+      },
+    );
+  }
+
+  void _tryNextImage() {
+    if (!mounted) return;
+    if (_currentIndex >= _candidates.length - 1) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _currentIndex += 1;
+      });
+    });
+  }
+
+  List<String> _buildCandidates(Product product) {
+    final urls = <String>[];
+
+    final thumb = product.thumbnailUrl.trim();
+    if (thumb.isNotEmpty) {
+      final normalized = _normalizeImageUrl(thumb);
+      if (normalized.isNotEmpty) {
+        urls.add(normalized);
+      }
+    }
+
+    for (final value in product.imageUrls) {
+      final url = value.trim();
+      if (url.isEmpty) continue;
+      final normalized = _normalizeImageUrl(url);
+      if (normalized.isNotEmpty && !urls.contains(normalized)) {
+        urls.add(normalized);
+      }
+    }
+
+    return urls;
+  }
+
+  String _normalizeImageUrl(String rawUrl) {
+    final url = rawUrl.trim();
+    if (url.isEmpty) {
+      return '';
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return Uri.encodeFull(url);
+    }
+
+    final host = uri.host.toLowerCase();
+    if (!host.contains('drive.google.com')) {
+      return Uri.encodeFull(url);
+    }
+
+    String? fileId;
+    final segments = uri.pathSegments;
+
+    final dIndex = segments.indexOf('d');
+    if (dIndex != -1 && dIndex + 1 < segments.length) {
+      fileId = segments[dIndex + 1];
+    }
+
+    fileId ??= uri.queryParameters['id'];
+
+    if (fileId == null || fileId.isEmpty) {
+      return Uri.encodeFull(url);
+    }
+
+    return 'https://drive.google.com/uc?export=view&id=$fileId';
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Container(
+      color: AppColors.shimmerBase,
+      child: const Center(
+        child: Icon(
+          Icons.checkroom_rounded,
+          color: AppColors.textHint,
+          size: 32,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageError() {
+    return Container(
+      color: AppColors.shimmerBase,
+      child: const Center(
+        child: Icon(
+          Icons.broken_image_rounded,
+          color: AppColors.textHint,
+          size: 32,
         ),
       ),
     );
