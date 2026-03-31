@@ -4,11 +4,13 @@ import '../../constants/app_constants.dart';
 import '../../models/product_model.dart';
 
 /// Widget thẻ sản phẩm dùng trong GridView
+
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
   final VoidCallback? onFavoriteTap;
   final bool isFavorite;
+  final bool showCategoryBadge;
 
   const ProductCard({
     super.key,
@@ -16,6 +18,7 @@ class ProductCard extends StatelessWidget {
     this.onTap,
     this.onFavoriteTap,
     this.isFavorite = false,
+    this.showCategoryBadge = true,
   });
 
   @override
@@ -27,9 +30,9 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Ảnh sản phẩm ──────────────────────────────────
+            // ── Ảnh sản phẩm (tăng không gian ảnh, giảm phần thông tin)
             Expanded(
-              flex: 3,
+              flex: 4,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -61,54 +64,57 @@ class ProductCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Badge danh mục
-                  Positioned(
-                    bottom: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        AppConstants.getCategoryName(product.category),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
+                  // Badge danh mục (chỉ hiển thị nếu showCategoryBadge)
+                  if (showCategoryBadge)
+                    Positioned(
+                      bottom: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          AppConstants.getCategoryName(product.category),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
 
-            // ── Thông tin sản phẩm ────────────────────────────
+            // ── Thông tin sản phẩm (giảm khoảng trống bên trong)
             Expanded(
-              flex: 2,
+              flex: 1,
               child: Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Tên sản phẩm
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                        height: 1.3,
+                    Flexible(
+                      child: Text(
+                        product.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          height: 1.0,
+                        ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 2),
 
                     // Đánh giá
                     Row(
@@ -116,9 +122,9 @@ class ProductCard extends StatelessWidget {
                         const Icon(
                           Icons.star_rounded,
                           color: AppColors.star,
-                          size: 14,
+                          size: 12,
                         ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 4),
                         Text(
                           product.rating.toStringAsFixed(1),
                           style: const TextStyle(
@@ -127,7 +133,7 @@ class ProductCard extends StatelessWidget {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(width: 3),
+                        const SizedBox(width: 6),
                         Text(
                           '(${product.reviewCount})',
                           style: const TextStyle(
@@ -137,15 +143,31 @@ class ProductCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
 
-                    // Giá thuê
-                    Text(
-                      '${AppConstants.formatPrice(product.rentalPricePerDay)}/ngày',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
+                    // Giá thuê (số màu primary, đơn vị màu phụ)
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: AppConstants.formatPrice(
+                              product.rentalPricePerDay,
+                            ),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          TextSpan(
+                            text: '/ngày',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -203,7 +225,7 @@ class _ProductImageState extends State<_ProductImage> {
         if (loadingProgress == null) return child;
         return _buildImagePlaceholder();
       },
-      errorBuilder: (_, __, ___) {
+      errorBuilder: (context, error, stackTrace) {
         _tryNextImage();
         return _buildImageError();
       },

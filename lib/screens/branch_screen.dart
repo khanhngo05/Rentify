@@ -57,7 +57,7 @@ class _BranchScreenState extends State<BranchScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               itemCount: _viewModel.branchDistances.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final item = _viewModel.branchDistances[index];
                 final branch = item.branch;

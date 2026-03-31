@@ -92,7 +92,7 @@ class OrderModel {
   });
 
   /// Tổng số sản phẩm trong đơn
-  int get totalItemCount => items.fold(0, (sum, item) => sum + item.quantity);
+  int get totalItemCount => items.fold(0, (acc, item) => acc + item.quantity);
 
   factory OrderModel.fromFirestore(Map<String, dynamic> data, String id) {
     return OrderModel(

@@ -1,8 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
@@ -10,11 +8,6 @@ import 'branch_screen.dart';
 import '../services/firebase_service.dart';
 import '../widgets/common/product_card.dart';
 
-/// HomeScreen hiển thị danh sách sản phẩm với tìm kiếm + lọc danh mục.
-///
-/// Áp dụng MVVM đơn giản:
-/// - View: `HomeScreen`
-/// - ViewModel: `_HomeViewModel`
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -24,277 +17,375 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final _HomeViewModel _viewModel;
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = _HomeViewModel(firebaseService: FirebaseService())
-      ..loadProducts();
+    _viewModel = _HomeViewModel(firebaseService: FirebaseService());
+    _viewModel.addListener(_onModelChanged);
+    _searchController.addListener(
+      () => _viewModel.onSearchChanged(_searchController.text),
+    );
+    _viewModel.loadProducts();
+  }
+
+  void _onModelChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _viewModel.removeListener(_onModelChanged);
     _viewModel.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: const [
-            Icon(Icons.checkroom_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Rentify'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _HomeAppBar(
+              searchController: _searchController,
+              isExpanded: _isSearchExpanded,
+              onToggleExpand: () =>
+                  setState(() => _isSearchExpanded = !_isSearchExpanded),
+              onCartTap: () => ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Giỏ hàng'))),
+              onLocationTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const BranchScreen())),
+              onNotifyTap: () => ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Thông báo'))),
+              onClear: () {
+                // collapse and reset search when user taps clear
+                _searchController.clear();
+                setState(() => _isSearchExpanded = false);
+              },
+            ),
+
+            const SizedBox(height: 8),
+
+            _CategoryChips(
+              categories: _viewModel.categories,
+              selected: _viewModel.selectedCategory,
+              onSelected: (c) => _viewModel.onCategoryChanged(c),
+            ),
+
+            const SizedBox(height: 8),
+
+            Expanded(child: _buildBody()),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              // TODO: Navigate to cart screen.
-            },
-            icon: const Icon(Icons.shopping_cart),
-            tooltip: 'Giỏ hàng',
-          ),
-          IconButton(
-            onPressed: _openQuickMenu,
-            icon: const Icon(Icons.more_vert_rounded),
-            tooltip: 'Menu',
-          ),
-        ],
-      ),
-      body: AnimatedBuilder(
-        animation: _viewModel,
-        builder: (context, _) {
-          return Column(
-            children: [
-              _SearchSection(viewModel: _viewModel),
-              const SizedBox(height: 8),
-              Expanded(child: _buildBodyByState()),
-            ],
-          );
-        },
       ),
     );
   }
 
-  Widget _buildBodyByState() {
-    if (_viewModel.state == HomeViewState.loading) {
-      return const _ProductGridShimmer();
-    }
-
-    if (_viewModel.state == HomeViewState.error) {
-      return _ErrorState(
-        message: _viewModel.errorMessage,
-        onRetry: _viewModel.loadProducts,
-      );
-    }
-
-    if (_viewModel.filteredProducts.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _viewModel.loadProducts,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 120),
-            Center(
-              child: Text(
-                'Không tìm thấy sản phẩm phù hợp',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _viewModel.loadProducts,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final aspectRatio = width > 700 ? 0.78 : 0.7;
-
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            physics: const AlwaysScrollableScrollPhysics(),
-            itemCount: _viewModel.filteredProducts.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: aspectRatio,
-            ),
-            itemBuilder: (context, index) {
-              final product = _viewModel.filteredProducts[index];
-              return ProductCard(
+  Widget _buildBody() {
+    switch (_viewModel.state) {
+      case HomeViewState.loading:
+        return const _ProductGridShimmer();
+      case HomeViewState.error:
+        return Center(
+          child: Text(
+            _viewModel.errorMessage.isEmpty ? 'Lỗi' : _viewModel.errorMessage,
+          ),
+        );
+      case HomeViewState.success:
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.68,
+          ),
+          itemCount: _viewModel.filteredProducts.length,
+          itemBuilder: (context, index) {
+            final product = _viewModel.filteredProducts[index];
+            return Hero(
+              tag: 'product_${product.id}',
+              child: ProductCard(
                 product: product,
-                onTap: () {
-                  // TODO: Navigate to product detail screen.
-                },
-                onFavoriteTap: () {
-                  // TODO: Add/remove favorite.
-                },
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _openQuickMenu() async {
-    await showGeneralDialog<void>(
-      context: context,
-      barrierLabel: 'QuickMenu',
-      barrierDismissible: true,
-      barrierColor: Colors.black.withValues(alpha: 0.28),
-      transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) {
-        return Align(
-          alignment: Alignment.centerRight,
-          child: SafeArea(
-            child: Material(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(22),
-                bottomLeft: Radius.circular(22),
+                onTap: () {},
+                onFavoriteTap: () {},
+                isFavorite: false,
+                showCategoryBadge: true,
               ),
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.84,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.menu_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Tùy chọn nhanh',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+            );
+          },
+        );
+    }
+  }
+}
+
+// --- AppBar ---
+class _HomeAppBar extends StatelessWidget {
+  final TextEditingController searchController;
+  final bool isExpanded;
+  final VoidCallback onToggleExpand;
+  final VoidCallback onCartTap;
+  final VoidCallback onLocationTap;
+  final VoidCallback onNotifyTap;
+  final VoidCallback onClear;
+
+  const _HomeAppBar({
+    required this.searchController,
+    required this.isExpanded,
+    required this.onToggleExpand,
+    required this.onCartTap,
+    required this.onLocationTap,
+    required this.onNotifyTap,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12.0),
+                      child: Text(
+                        'Rentify',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
                         ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.tune_rounded, size: 18),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Bộ lọc danh mục',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _HomeViewModel.categories.map((
-                                  category,
-                                ) {
-                                  final isSelected =
-                                      _viewModel.selectedCategory == category;
-                                  return ChoiceChip(
-                                    label: Text(category),
-                                    selected: isSelected,
-                                    onSelected: (_) {
-                                      _viewModel.onCategoryChanged(category);
-                                      Navigator.of(context).pop();
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.location_on_outlined),
-                          title: const Text('Vị trí chi nhánh gần bạn'),
-                          subtitle: const Text(
-                            'Xem danh sách chi nhánh theo GPS',
-                          ),
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const BranchScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                      ),
                     ),
+                  ),
+                ),
+
+                // right-side actions: notify, cart, location
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications_none,
+                        size: 24,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: onNotifyTap,
+                      tooltip: 'Thông báo',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.shopping_cart_outlined,
+                        size: 26,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: onCartTap,
+                      tooltip: 'Giỏ hàng',
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.location_on_outlined,
+                        size: 26,
+                        color: AppColors.primary,
+                      ),
+                      onPressed: onLocationTap,
+                      tooltip: 'Chi nhánh',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // compact search inside appbar when not expanded; otherwise full search below
+          AnimatedCrossFade(
+            firstChild: GestureDetector(
+              onTap: onToggleExpand,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.search_rounded, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tìm sản phẩm...',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Center(
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 8,
+                      ),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          searchController.clear();
+                          FocusScope.of(context).unfocus();
+                          onClear();
+                        },
+                      ),
+                    ),
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
                   ),
                 ),
               ),
             ),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
           ),
-        );
-      },
-      transitionBuilder: (context, animation, _, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: FadeTransition(opacity: curved, child: child),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Category Filter Chips ---
+class _CategoryChips extends StatelessWidget {
+  final List<String> categories;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _CategoryChips({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: categories.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final key = categories[i];
+          final isSelected = selected == key;
+          final display = key == _HomeViewModel.allCategory
+              ? 'Tất cả'
+              : AppConstants.getCategoryName(key);
+          return ChoiceChip(
+            label: Text(
+              display,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+            selected: isSelected,
+            onSelected: (_) => onSelected(key),
+            backgroundColor: AppColors.surfaceVariant,
+            selectedColor: AppColors.primary,
+            shape: const StadiumBorder(),
+            elevation: isSelected ? 2 : 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- Shimmer Loading State ---
+class _ProductGridShimmer extends StatelessWidget {
+  const _ProductGridShimmer();
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 6,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.68,
+      ),
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: AppColors.shimmerBase,
+          highlightColor: AppColors.shimmerHighlight,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.symmetric(vertical: 4),
+          ),
         );
       },
     );
   }
 }
 
+// --- ViewModel ---
 enum HomeViewState { loading, success, error }
 
 class _HomeViewModel extends ChangeNotifier {
   _HomeViewModel({required FirebaseService firebaseService})
     : _firebaseService = firebaseService;
-
   final FirebaseService _firebaseService;
-
-  static const String allCategory = 'Tất cả';
-  static const List<String> categories = [
-    allCategory,
-    'Quần',
-    'Áo',
-    'Váy',
-    'Giày',
-    'Phụ kiện',
-  ];
-
+  static const String allCategory = 'all';
+  List<String> categories = [allCategory];
   HomeViewState state = HomeViewState.loading;
   String errorMessage = '';
-
   String selectedCategory = allCategory;
   String _searchKeyword = '';
-
   Timer? _debounce;
-
   List<Product> _allProducts = [];
   List<Product> filteredProducts = [];
 
@@ -302,10 +393,14 @@ class _HomeViewModel extends ChangeNotifier {
     state = HomeViewState.loading;
     errorMessage = '';
     notifyListeners();
-
     try {
       _allProducts = await _firebaseService.getProducts();
-      _applySearchAndFilter();
+      final keys = _allProducts.map((p) => p.category).toSet().toList();
+      categories = [allCategory, ...keys];
+      if (!categories.contains(selectedCategory)) {
+        selectedCategory = allCategory;
+      }
+      _applyFilter();
       state = HomeViewState.success;
       notifyListeners();
     } catch (error) {
@@ -317,205 +412,33 @@ class _HomeViewModel extends ChangeNotifier {
 
   void onSearchChanged(String value) {
     _debounce?.cancel();
-
-    // Debounce cơ bản để giảm số lần filter khi user gõ liên tục.
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _searchKeyword = value.trim().toLowerCase();
-      _applySearchAndFilter();
-      if (state != HomeViewState.loading) {
-        notifyListeners();
-      }
-    });
+    _searchKeyword = value;
+    _debounce = Timer(const Duration(milliseconds: 350), _applyFilter);
   }
 
   void onCategoryChanged(String category) {
-    if (selectedCategory == category) {
-      return;
-    }
-
     selectedCategory = category;
-    _applySearchAndFilter();
-    if (state != HomeViewState.loading) {
-      notifyListeners();
-    }
+    _applyFilter();
   }
 
-  void _applySearchAndFilter() {
+  void _applyFilter() {
+    final keyword = _searchKeyword.toLowerCase().trim();
     filteredProducts = _allProducts.where((product) {
-      final normalizedCategoryLabel = AppConstants.getCategoryName(
-        product.category,
-      ).toLowerCase();
-      final normalizedRawCategory = product.category.toLowerCase();
-
-      final matchSearch =
-          _searchKeyword.isEmpty ||
-          product.name.toLowerCase().contains(_searchKeyword) ||
-          normalizedCategoryLabel.contains(_searchKeyword) ||
-          normalizedRawCategory.contains(_searchKeyword);
-
-      final matchCategory =
+      final matchesCategory =
           selectedCategory == allCategory ||
-          _isProductInCategory(product.category, selectedCategory);
-
-      return matchSearch && matchCategory;
+          product.category == selectedCategory;
+      final matchesSearch =
+          keyword.isEmpty ||
+          product.name.toLowerCase().contains(keyword) ||
+          product.category.toLowerCase().contains(keyword);
+      return matchesCategory && matchesSearch;
     }).toList();
-  }
-
-  bool _isProductInCategory(String productCategory, String selected) {
-    final value = productCategory.toLowerCase();
-
-    switch (selected) {
-      case 'Quần':
-        return value.contains('quan') || value.contains('pant');
-      case 'Áo':
-        return value.contains('ao') ||
-            value.contains('shirt') ||
-            value.contains('top');
-      case 'Váy':
-        return value.contains('vay') ||
-            value.contains('dam') ||
-            value.contains('dress');
-      case 'Giày':
-        return value.contains('giay') || value.contains('shoe');
-      case 'Phụ kiện':
-        return value.contains('phu_kien') ||
-            value.contains('phukien') ||
-            value.contains('accessory') ||
-            value.contains('phụ kiện');
-      default:
-        return true;
-    }
+    notifyListeners();
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
-  }
-}
-
-class _SearchSection extends StatelessWidget {
-  const _SearchSection({required this.viewModel});
-
-  final _HomeViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            onChanged: viewModel.onSearchChanged,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Tìm theo tên hoặc danh mục',
-              prefixIcon: const Icon(Icons.search_rounded),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 36,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _HomeViewModel.categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final category = _HomeViewModel.categories[index];
-                final isSelected = viewModel.selectedCategory == category;
-
-                return ChoiceChip(
-                  label: Text(category),
-                  selected: isSelected,
-                  onSelected: (_) => viewModel.onCategoryChanged(category),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProductGridShimmer extends StatelessWidget {
-  const _ProductGridShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      itemCount: 6,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.7,
-      ),
-      itemBuilder: (_, __) {
-        return Shimmer.fromColors(
-          baseColor: AppColors.shimmerBase,
-          highlightColor: AppColors.shimmerHighlight,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: AppColors.error,
-              size: 38,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

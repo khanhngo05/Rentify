@@ -26,6 +26,7 @@ class AppConstants {
   // ── Danh mục sản phẩm ─────────────────────────────────────
   static const Map<String, String> categories = {
     'ao_dai': 'Áo dài',
+    'quan': 'Quần',
     'vay_cuoi': 'Váy cưới',
     'dam_da_hoi': 'Đầm dạ hội',
     'vest_suit': 'Vest / Suit',
@@ -33,6 +34,7 @@ class AppConstants {
     'trang_phuc_dan_toc': 'Trang phục dân tộc',
     'trang_phuc_chup_anh': 'Trang phục chụp ảnh',
     'phu_kien': 'Phụ kiện',
+    'giay': 'Giày',
   };
 
   // ── Trạng thái đơn thuê ───────────────────────────────────
@@ -74,10 +76,12 @@ class AppConstants {
 
   /// Format giá tiền VNĐ (VD: 250,000₫)
   static String formatPrice(double price) {
-    final formatted = price.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (match) => '${match[1]},',
-    );
+    final formatted = price
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (match) => '${match[1]},',
+        );
     return '$formatted$currencySymbol';
   }
 }

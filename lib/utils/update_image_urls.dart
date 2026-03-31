@@ -155,7 +155,9 @@ class UpdateImages {
 
     // Cập nhật Chi nhánh
     for (final entry in branchImageUrls.entries) {
-      if (entry.value.isEmpty || entry.value.contains('link-anh-')) continue;
+      if (entry.value.isEmpty || entry.value.contains('link-anh-')) {
+        continue;
+      }
 
       await _db
           .collection(AppConstants.branchesCollection)
@@ -169,8 +171,9 @@ class UpdateImages {
       final List<String> urls = entry.value;
       if (urls.isEmpty ||
           urls.first.isEmpty ||
-          urls.first.contains('link-thumbnail-'))
+          urls.first.contains('link-thumbnail-')) {
         continue;
+      }
 
       final String thumbUrl = urls.first;
       final List<String> detailUrls = urls.length > 1 ? urls.sublist(1) : [];
