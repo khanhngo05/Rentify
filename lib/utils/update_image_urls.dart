@@ -146,6 +146,46 @@ class UpdateImages {
       '$supabaseBaseUrl/products/prod_030.jpg',
       '$supabaseBaseUrl/products/prod_030.jpg',
     ],
+    'prod_031': [
+      '$supabaseBaseUrl/products/prod_031.jpg',
+      '$supabaseBaseUrl/products/prod_031.jpg',
+    ],
+    'prod_032': [
+      '$supabaseBaseUrl/products/prod_032.jpg',
+      '$supabaseBaseUrl/products/prod_032.jpg',
+    ],
+    'prod_033': [
+      '$supabaseBaseUrl/products/prod_033.jpg',
+      '$supabaseBaseUrl/products/prod_033.jpg',
+    ],
+    'prod_034': [
+      '$supabaseBaseUrl/products/prod_034.jpg',
+      '$supabaseBaseUrl/products/prod_034.jpg',
+    ],
+    'prod_035': [
+      '$supabaseBaseUrl/products/prod_035.jpg',
+      '$supabaseBaseUrl/products/prod_035.jpg',
+    ],
+    'prod_036': [
+      '$supabaseBaseUrl/products/prod_036.jpg',
+      '$supabaseBaseUrl/products/prod_036.jpg',
+    ],
+    'prod_037': [
+      '$supabaseBaseUrl/products/prod_037.jpg',
+      '$supabaseBaseUrl/products/prod_037.jpg',
+    ],
+    'prod_038': [
+      '$supabaseBaseUrl/products/prod_038.jpg',
+      '$supabaseBaseUrl/products/prod_038.jpg',
+    ],
+    'prod_039': [
+      '$supabaseBaseUrl/products/prod_039.jpg',
+      '$supabaseBaseUrl/products/prod_039.jpg',
+    ],
+    'prod_040': [
+      '$supabaseBaseUrl/products/prod_040.jpg',
+      '$supabaseBaseUrl/products/prod_040.jpg',
+    ],
     
   };
   /// Chạy hàm này để cập nhật URLs lên Firestore

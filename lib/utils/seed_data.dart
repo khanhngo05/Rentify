@@ -63,7 +63,7 @@ class SeedData {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  CHI NHÁNH (3 chi nhánh tại Hà Nội — địa chỉ từ sample_data.json)
+  //  CHI NHÁNH
   // ═══════════════════════════════════════════════════════════════
   static Future<void> _seedBranches() async {
     final branches = [
@@ -138,7 +138,7 @@ class SeedData {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  SẢN PHẨM (30 sản phẩm)
+  //  SẢN PHẨM (40 sản phẩm)
   // ═══════════════════════════════════════════════════════════════
   static Future<void> _seedProducts() async {
     final products = [
@@ -697,6 +697,190 @@ class SeedData {
         'createdAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       },
+
+      // ── Quần Trang Trọng (31-35) ──
+      {
+        'name': 'Quần Tây Âu Nam Premium Silk',
+        'description': 'Quần tây nam cao cấp pha lụa, bề mặt mịn màng, giữ form cực chuẩn. Thiết kế túi mổ tinh tế, lý tưởng cho các buổi tiệc cưới hoặc hội nghị cấp cao.',
+        'rentalPricePerDay': 180000,
+        'depositAmount': 800000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'quan',
+        'sizes': ['30', '31', '32', '33', '34'],
+        'colors': ['Đen Carbon', 'Xanh Midnight'],
+        'brand': 'Royal Tailor',
+        'rating': 4.9,
+        'reviewCount': 12,
+        'isActive': true,
+        'tags': ['quần tây', 'nam', 'premium', 'trang trọng'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Quần Tây Âu Nam Slimfit Navy',
+        'description': 'Dáng slimfit hiện đại tôn dáng người mặc. Chất liệu vải Wool 100% nhập khẩu, thoáng mát và ít nhăn.',
+        'rentalPricePerDay': 160000,
+        'depositAmount': 700000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'quan',
+        'sizes': ['29', '30', '31', '32'],
+        'colors': ['Xanh Navy'],
+        'brand': 'GentleMan VN',
+        'rating': 4.8,
+        'reviewCount': 25,
+        'isActive': true,
+        'tags': ['quần tây', 'slimfit', 'navy', 'công sở'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Quần Culottes Lụa Cao Cấp Cho Nữ',
+        'description': 'Thiết kế ống rộng thanh lịch, chất liệu lụa satin dày dặn. Phù hợp cho các sự kiện khai trương hoặc tiệc tối trang trọng.',
+        'rentalPricePerDay': 200000,
+        'depositAmount': 1000000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'quan',
+        'sizes': ['S', 'M', 'L'],
+        'colors': ['Trắng Ngọc Trai', 'Beige'],
+        'brand': 'Elegant Lady',
+        'rating': 4.7,
+        'reviewCount': 18,
+        'isActive': true,
+        'tags': ['culottes', 'nữ', 'lụa', 'sang trọng'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Quần Kaki Công Sở Lịch Lãm',
+        'description': 'Sự kết hợp hoàn hảo giữa nét trẻ trung và sự chuyên nghiệp. Kaki chun co giãn nhẹ giúp thoải mái vận động suốt cả ngày.',
+        'rentalPricePerDay': 140000,
+        'depositAmount': 500000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'quan',
+        'sizes': ['30', '31', '32', '33'],
+        'colors': ['Khaki', 'Xám Khói'],
+        'brand': 'Modern Office',
+        'rating': 4.6,
+        'reviewCount': 42,
+        'isActive': true,
+        'tags': ['quần kaki', 'công sở', 'nam', 'lịch lãm'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Quần Tây Nữ Ống Đứng Classic',
+        'description': 'Thiết kế ống đứng kinh điển giúp đôi chân trông dài hơn. Chất liệu vải tuyết mưa cao cấp, không bám bụi.',
+        'rentalPricePerDay': 150000,
+        'depositAmount': 600000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'quan',
+        'sizes': ['XS', 'S', 'M', 'L'],
+        'colors': ['Đen'],
+        'brand': 'LadyMode',
+        'rating': 4.8,
+        'reviewCount': 37,
+        'isActive': true,
+        'tags': ['quần tây nữ', 'classic', 'ống đứng', 'công sở'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+
+      // ── Giày Cao Cấp (36-40) ──
+      {
+        'name': 'Giày Oxford Nam Da Thật',
+        'description': 'Mẫu giày tây kinh điển nhất dành cho phái mạnh. Da bò thật 100% được đánh bóng thủ công, đế phíp cao cấp tăng chiều cao 3cm.',
+        'rentalPricePerDay': 250000,
+        'depositAmount': 1500000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'giay',
+        'sizes': ['39', '40', '41', '42', '43'],
+        'colors': ['Đen'],
+        'brand': 'GentleMan VN',
+        'rating': 5.0,
+        'reviewCount': 15,
+        'isActive': true,
+        'tags': ['giày oxford', 'giày tây', 'da thật', 'trang trọng'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Giày Derby Nam Sang Trọng',
+        'description': 'Sự lựa chọn hoàn hảo cho những quý ông ưa thích nét cổ điển pha chút hiện đại. Màu nâu Patina quyến rũ, dễ phối với suit xanh hoặc xám.',
+        'rentalPricePerDay': 220000,
+        'depositAmount': 1200000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'giay',
+        'sizes': ['39', '40', '41', '42'],
+        'colors': ['Nâu Patina'],
+        'brand': 'Classic Men',
+        'rating': 4.9,
+        'reviewCount': 21,
+        'isActive': true,
+        'tags': ['giày derby', 'nâu', 'da bò', 'quý ông'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Giày Cao Gót Mũi Nhọn Đính Đá',
+        'description': 'Mẫu giày "Lọ Lem" dành cho các bữa tiệc tối lộng lẫy. Đính đá pha lê Swarovski lấp lánh, gót nhọn 9cm tôn dáng tuyệt đối.',
+        'rentalPricePerDay': 300000,
+        'depositAmount': 2000000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'giay',
+        'sizes': ['35', '36', '37', '38'],
+        'colors': ['Bạc Lấp Lánh'],
+        'brand': 'LuxeFootwear',
+        'rating': 5.0,
+        'reviewCount': 10,
+        'isActive': true,
+        'tags': ['giày cao gót', 'đính đá', 'dạ tiệc', 'sang trọng'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Giày Loafer Nam Da Bóng',
+        'description': 'Thiết kế không dây tiện lợi nhưng không kém phần lịch lãm. Phù hợp phối cùng quần tây hoặc suit trong các sự kiện Semi-formal.',
+        'rentalPricePerDay': 200000,
+        'depositAmount': 1000000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'giay',
+        'sizes': ['40', '41', '42', '43'],
+        'colors': ['Đen Bóng'],
+        'brand': 'Modern Man',
+        'rating': 4.7,
+        'reviewCount': 33,
+        'isActive': true,
+        'tags': ['giày loafer', 'tiện lợi', 'lịch lãm', 'da bóng'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
+      {
+        'name': 'Giày Sandal Cao Gót Quai Mảnh Gold',
+        'description': 'Thiết kế thanh thoát với quai mảnh màu vàng gold kim loại. Phối hợp hoàn hảo cùng các mẫu đầm dạ hội dài xẻ đùi.',
+        'rentalPricePerDay': 180000,
+        'depositAmount': 800000,
+        'thumbnailUrl': '',
+        'imageUrls': <String>[],
+        'category': 'giay',
+        'sizes': ['36', '37', '38', '39'],
+        'colors': ['Vàng Gold'],
+        'brand': 'Elegant Footwear',
+        'rating': 4.8,
+        'reviewCount': 14,
+        'isActive': true,
+        'tags': ['sandal cao gót', 'vàng gold', 'nữ', 'thanh thoát'],
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      },
     ];
 
     for (int i = 0; i < products.length; i++) {
@@ -709,7 +893,7 @@ class SeedData {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  TỒN KHO (phân bổ sản phẩm cho từng chi nhánh)
+  //  TỒN KHO
   // ═══════════════════════════════════════════════════════════════
   static Future<void> _seedInventory() async {
     final inventoryData = {
@@ -734,6 +918,11 @@ class SeedData {
         'prod_027': {'totalStock': 4, 'availableStock': 4},
         'prod_028': {'totalStock': 3, 'availableStock': 3},
         'prod_029': {'totalStock': 3, 'availableStock': 3},
+        'prod_031': {'totalStock': 5, 'availableStock': 5},
+        'prod_033': {'totalStock': 3, 'availableStock': 3},
+        'prod_035': {'totalStock': 4, 'availableStock': 4},
+        'prod_037': {'totalStock': 3, 'availableStock': 3},
+        'prod_039': {'totalStock': 4, 'availableStock': 4},
       },
       'branch_002': {
         'prod_001': {'totalStock': 2, 'availableStock': 2},
@@ -753,6 +942,11 @@ class SeedData {
         'prod_026': {'totalStock': 3, 'availableStock': 3},
         'prod_028': {'totalStock': 2, 'availableStock': 2},
         'prod_030': {'totalStock': 4, 'availableStock': 4},
+        'prod_032': {'totalStock': 4, 'availableStock': 4},
+        'prod_034': {'totalStock': 3, 'availableStock': 3},
+        'prod_036': {'totalStock': 4, 'availableStock': 4},
+        'prod_038': {'totalStock': 2, 'availableStock': 2},
+        'prod_040': {'totalStock': 3, 'availableStock': 3},
       },
       'branch_003': {
         'prod_002': {'totalStock': 1, 'availableStock': 0},
@@ -776,6 +970,12 @@ class SeedData {
         'prod_027': {'totalStock': 3, 'availableStock': 3},
         'prod_029': {'totalStock': 2, 'availableStock': 2},
         'prod_030': {'totalStock': 3, 'availableStock': 3},
+        'prod_031': {'totalStock': 2, 'availableStock': 2},
+        'prod_032': {'totalStock': 2, 'availableStock': 2},
+        'prod_034': {'totalStock': 2, 'availableStock': 2},
+        'prod_036': {'totalStock': 2, 'availableStock': 2},
+        'prod_038': {'totalStock': 2, 'availableStock': 2},
+        'prod_040': {'totalStock': 2, 'availableStock': 2},
       },
     };
 
