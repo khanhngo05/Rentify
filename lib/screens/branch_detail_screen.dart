@@ -83,6 +83,39 @@ class BranchDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Mini map preview (tap để mở chỉ đường)
+            GestureDetector(
+              onTap: _openDirections,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Bản đồ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      height: 160,
+                      width: double.infinity,
+                      child: Image.network(
+                        // Yandex Static Maps provides a free static preview without API key in many regions.
+                        // Replace with Google Static Maps if you have an API key.
+                        'https://static-maps.yandex.ru/1.x/?ll=${branch.longitude},${branch.latitude}&size=650,300&z=15&l=map&pt=${branch.longitude},${branch.latitude},pm2rdm',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stack) => Container(
+                          color: AppColors.surfaceVariant,
+                          child: const Center(child: Icon(Icons.map_outlined)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

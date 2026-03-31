@@ -1,12 +1,16 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
-import '../constants/app_colors.dart';
-import '../constants/app_constants.dart';
-import '../models/product_model.dart';
+// imports specific to widgets are in their files
 import 'branch_screen.dart';
+import 'history_screen.dart';
+import 'profile_screen.dart';
+import 'messages_screen.dart';
+import '../constants/app_colors.dart';
 import '../services/firebase_service.dart';
 import '../widgets/common/product_card.dart';
+import '../viewmodels/home_view_model.dart';
+import 'home/widgets/home_app_bar.dart';
+import 'home/widgets/category_chips.dart';
+import 'home/widgets/product_grid_shimmer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,14 +20,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final _HomeViewModel _viewModel;
+  late final HomeViewModel _viewModel;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearchExpanded = false;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = _HomeViewModel(firebaseService: FirebaseService());
+    _viewModel = HomeViewModel(firebaseService: FirebaseService());
     _viewModel.addListener(_onModelChanged);
     _searchController.addListener(
       () => _viewModel.onSearchChanged(_searchController.text),
@@ -46,11 +51,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
+    Widget _buildNavIcon(IconData icon, bool selected) {
+      return Transform.translate(
+        offset: Offset(0, selected ? -6 : 0),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.primary : Colors.transparent,
+              width: 1.6,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            icon,
+            color: selected ? AppColors.primary : AppColors.textHint,
+            size: 22,
+          ),
+        ),
+      );
+    }
+
+    final pages = <Widget>[
+      // Home page (original content)
+      SafeArea(
         child: Column(
           children: [
-            _HomeAppBar(
+            HomeAppBar(
               searchController: _searchController,
               isExpanded: _isSearchExpanded,
               onToggleExpand: () =>
@@ -58,9 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onCartTap: () => ScaffoldMessenger.of(
                 context,
               ).showSnackBar(const SnackBar(content: Text('Giỏ hàng'))),
-              onLocationTap: () => Navigator.of(
+              onMessageTap: () => Navigator.of(
                 context,
-              ).push(MaterialPageRoute(builder: (_) => const BranchScreen())),
+              ).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),
               onNotifyTap: () => ScaffoldMessenger.of(
                 context,
               ).showSnackBar(const SnackBar(content: Text('Thông báo'))),
@@ -73,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 8),
 
-            _CategoryChips(
+            CategoryChips(
               categories: _viewModel.categories,
               selected: _viewModel.selectedCategory,
               onSelected: (c) => _viewModel.onCategoryChanged(c),
@@ -85,13 +122,53 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+
+      // Branches
+      const BranchScreen(),
+
+      // History (placeholder)
+      const HistoryScreen(),
+
+      // Profile / Me
+      const ProfileScreen(),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(index: _selectedIndex, children: pages),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        type: BottomNavigationBarType.fixed,
+        onTap: (i) => setState(() => _selectedIndex = i),
+        items: [
+          BottomNavigationBarItem(
+            icon: _buildNavIcon(Icons.home_outlined, false),
+            activeIcon: _buildNavIcon(Icons.home_rounded, true),
+            label: 'Trang chủ',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavIcon(Icons.storefront_outlined, false),
+            activeIcon: _buildNavIcon(Icons.storefront_rounded, true),
+            label: 'Chi nhánh',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavIcon(Icons.history_outlined, false),
+            activeIcon: _buildNavIcon(Icons.history_rounded, true),
+            label: 'Lịch sử',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavIcon(Icons.person_outline, false),
+            activeIcon: _buildNavIcon(Icons.person_rounded, true),
+            label: 'Tôi',
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildBody() {
     switch (_viewModel.state) {
       case HomeViewState.loading:
-        return const _ProductGridShimmer();
+        return const ProductGridShimmer();
       case HomeViewState.error:
         return Center(
           child: Text(
@@ -127,318 +204,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // --- AppBar ---
-class _HomeAppBar extends StatelessWidget {
-  final TextEditingController searchController;
-  final bool isExpanded;
-  final VoidCallback onToggleExpand;
-  final VoidCallback onCartTap;
-  final VoidCallback onLocationTap;
-  final VoidCallback onNotifyTap;
-  final VoidCallback onClear;
+// HomeAppBar, CategoryChips and ProductGridShimmer moved to separate files under screens/home/widgets
 
-  const _HomeAppBar({
-    required this.searchController,
-    required this.isExpanded,
-    required this.onToggleExpand,
-    required this.onCartTap,
-    required this.onLocationTap,
-    required this.onNotifyTap,
-    required this.onClear,
-  });
+// Widgets and ViewModel moved to separate files under lib/viewmodels and lib/screens/home/widgets
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12.0),
-                      child: Text(
-                        'Rentify',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // right-side actions: notify, cart, location
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.notifications_none,
-                        size: 24,
-                        color: AppColors.primary,
-                      ),
-                      onPressed: onNotifyTap,
-                      tooltip: 'Thông báo',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.shopping_cart_outlined,
-                        size: 26,
-                        color: AppColors.primary,
-                      ),
-                      onPressed: onCartTap,
-                      tooltip: 'Giỏ hàng',
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.location_on_outlined,
-                        size: 26,
-                        color: AppColors.primary,
-                      ),
-                      onPressed: onLocationTap,
-                      tooltip: 'Chi nhánh',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // compact search inside appbar when not expanded; otherwise full search below
-          AnimatedCrossFade(
-            firstChild: GestureDetector(
-              onTap: onToggleExpand,
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.search_rounded, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Tìm sản phẩm...',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Center(
-                  child: TextField(
-                    controller: searchController,
-                    autofocus: true,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 8,
-                      ),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () {
-                          searchController.clear();
-                          FocusScope.of(context).unfocus();
-                          onClear();
-                        },
-                      ),
-                    ),
-                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
-                  ),
-                ),
-              ),
-            ),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// --- Category Filter Chips ---
-class _CategoryChips extends StatelessWidget {
-  final List<String> categories;
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  const _CategoryChips({
-    required this.categories,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final key = categories[i];
-          final isSelected = selected == key;
-          final display = key == _HomeViewModel.allCategory
-              ? 'Tất cả'
-              : AppConstants.getCategoryName(key);
-          return ChoiceChip(
-            label: Text(
-              display,
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 14,
-              ),
-            ),
-            selected: isSelected,
-            onSelected: (_) => onSelected(key),
-            backgroundColor: AppColors.surfaceVariant,
-            selectedColor: AppColors.primary,
-            shape: const StadiumBorder(),
-            elevation: isSelected ? 2 : 0,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-      ),
-    );
-  }
-}
-
-// --- Shimmer Loading State ---
-class _ProductGridShimmer extends StatelessWidget {
-  const _ProductGridShimmer();
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.68,
-      ),
-      itemBuilder: (context, index) {
-        return Shimmer.fromColors(
-          baseColor: AppColors.shimmerBase,
-          highlightColor: AppColors.shimmerHighlight,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            margin: const EdgeInsets.symmetric(vertical: 4),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// --- ViewModel ---
-enum HomeViewState { loading, success, error }
-
-class _HomeViewModel extends ChangeNotifier {
-  _HomeViewModel({required FirebaseService firebaseService})
-    : _firebaseService = firebaseService;
-  final FirebaseService _firebaseService;
-  static const String allCategory = 'all';
-  List<String> categories = [allCategory];
-  HomeViewState state = HomeViewState.loading;
-  String errorMessage = '';
-  String selectedCategory = allCategory;
-  String _searchKeyword = '';
-  Timer? _debounce;
-  List<Product> _allProducts = [];
-  List<Product> filteredProducts = [];
-
-  Future<void> loadProducts() async {
-    state = HomeViewState.loading;
-    errorMessage = '';
-    notifyListeners();
-    try {
-      _allProducts = await _firebaseService.getProducts();
-      final keys = _allProducts.map((p) => p.category).toSet().toList();
-      categories = [allCategory, ...keys];
-      if (!categories.contains(selectedCategory)) {
-        selectedCategory = allCategory;
-      }
-      _applyFilter();
-      state = HomeViewState.success;
-      notifyListeners();
-    } catch (error) {
-      errorMessage = 'Không thể tải sản phẩm. Vui lòng thử lại.';
-      state = HomeViewState.error;
-      notifyListeners();
-    }
-  }
-
-  void onSearchChanged(String value) {
-    _debounce?.cancel();
-    _searchKeyword = value;
-    _debounce = Timer(const Duration(milliseconds: 350), _applyFilter);
-  }
-
-  void onCategoryChanged(String category) {
-    selectedCategory = category;
-    _applyFilter();
-  }
-
-  void _applyFilter() {
-    final keyword = _searchKeyword.toLowerCase().trim();
-    filteredProducts = _allProducts.where((product) {
-      final matchesCategory =
-          selectedCategory == allCategory ||
-          product.category == selectedCategory;
-      final matchesSearch =
-          keyword.isEmpty ||
-          product.name.toLowerCase().contains(keyword) ||
-          product.category.toLowerCase().contains(keyword);
-      return matchesCategory && matchesSearch;
-    }).toList();
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-}
+// ViewModel moved to lib/viewmodels/home_view_model.dart
