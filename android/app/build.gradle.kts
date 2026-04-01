@@ -33,6 +33,7 @@ android {
         versionName = flutter.versionName
     }
 
+    // Use a shared debug keystore in repository so all team members have the same SHA.
     signingConfigs {
         getByName("debug") {
             storeFile = file("debug.keystore")

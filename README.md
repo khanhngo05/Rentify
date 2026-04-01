@@ -75,6 +75,21 @@ flutter pub get
 flutter run
 ```
 
+## 🔐 Google Sign-In cho team (SHA cố định)
+
+Project này cấu hình Android debug dùng chung `android/app/debug.keystore`, nên các máy trong team sẽ có cùng SHA khi chạy debug.
+
+Checklist khi clone lần đầu:
+
+1. Đảm bảo file `android/app/debug.keystore` có trong working tree.
+2. Vào Firebase Console, kiểm tra app Android `com.rentify.rentify` đã có SHA-1/SHA-256 của keystore này.
+3. Nếu Firebase thay đổi SHA hoặc OAuth, tải lại `android/app/google-services.json` mới nhất.
+
+Lưu ý:
+
+- Keystore này chỉ dùng cho môi trường debug nội bộ.
+- Bản release phải dùng release keystore riêng, không dùng debug keystore.
+
 ## 🗄️ Thiết kế CSDL
 
 Xem chi tiết tại thư mục `docs/DATABASE_DESIGN.md`

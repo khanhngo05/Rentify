@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../constants/app_constants.dart';
 import '../models/user_model.dart';
@@ -67,15 +68,38 @@ class AuthService {
 
   /// Dang nhap bang Google.
   Future<UserModel> signInWithGoogle() async {
-    final provider = GoogleAuthProvider();
-    provider.setCustomParameters(<String, String>{'prompt': 'select_account'});
-
     UserCredential credential;
     try {
       if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        provider.setCustomParameters(<String, String>{'prompt': 'select_account'});
         credential = await _auth.signInWithPopup(provider);
       } else {
-        credential = await _auth.signInWithProvider(provider);
+        final googleSignIn = GoogleSignIn(scopes: <String>['email', 'profile']);
+        await googleSignIn.signOut();
+        final googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          throw FirebaseAuthException(
+            code: 'sign_in_canceled',
+            message: 'Nguoi dung da huy dang nhap Google.',
+          );
+        }
+
+        final googleAuth = await googleUser.authentication;
+        if (googleAuth.idToken == null && googleAuth.accessToken == null) {
+          throw FirebaseAuthException(
+            code: 'missing-auth-token',
+            message: 'Khong lay duoc token tu Google Sign-In.',
+          );
+        }
+
+        final authCredential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        credential = await _auth.signInWithCredential(authCredential);
       }
     } on UnimplementedError {
       throw FirebaseAuthException(

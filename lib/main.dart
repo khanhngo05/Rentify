@@ -322,6 +322,10 @@ class _AuthOptionsSheetState extends State<_AuthOptionsSheet> {
         return 'Bạn đã đóng cửa sổ đăng nhập Google.';
       case 'popup-blocked':
         return 'Trình duyệt đã chặn popup đăng nhập.';
+      case 'sign_in_canceled':
+        return 'Bạn đã hủy đăng nhập Google.';
+      case 'missing-auth-token':
+        return 'Không nhận được token đăng nhập từ Google.';
       case 'too-many-requests':
         return 'Quá nhiều lần thử. Vui lòng đợi một lúc.';
       case 'network-request-failed':
