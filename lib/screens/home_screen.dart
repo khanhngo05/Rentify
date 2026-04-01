@@ -8,6 +8,7 @@ import '../constants/app_colors.dart';
 import '../services/firebase_service.dart';
 import '../widgets/common/product_card.dart';
 import '../viewmodels/home_view_model.dart';
+import 'product_detail_screen.dart';
 import 'home/widgets/home_app_bar.dart';
 import 'home/widgets/category_chips.dart';
 import 'home/widgets/product_grid_shimmer.dart';
@@ -191,7 +192,13 @@ class _HomeScreenState extends State<HomeScreen> {
               tag: 'product_${product.id}',
               child: ProductCard(
                 product: product,
-                onTap: () {},
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProductDetailScreen(product: product),
+                    ),
+                  );
+                },
                 onFavoriteTap: () {},
                 isFavorite: false,
                 showCategoryBadge: true,
