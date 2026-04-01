@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
@@ -21,7 +22,59 @@ class RentalBookingScreen extends StatefulWidget {
 }
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
-  int _rentalDays = 1;
+  late DateTimeRange _rentalRange;
+
+  int get _rentalDays {
+    return _rentalRange.end.difference(_rentalRange.start).inDays + 1;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _rentalRange = DateTimeRange(start: today, end: today);
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat(AppConstants.dateFormat).format(date);
+  }
+
+  Future<void> _pickRentalRange() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      initialDateRange: _rentalRange,
+      helpText: 'Chọn ngày thuê',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+      saveText: 'Lưu',
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    final selectedDays = picked.end.difference(picked.start).inDays + 1;
+    if (selectedDays < AppConstants.minRentalDays ||
+        selectedDays > AppConstants.maxRentalDays) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Vui lòng chọn từ ${AppConstants.minRentalDays} đến ${AppConstants.maxRentalDays} ngày.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _rentalRange = picked;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,22 +116,43 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Số ngày thuê',
+            'Thời gian thuê',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
-          Slider(
-            min: AppConstants.minRentalDays.toDouble(),
-            max: AppConstants.maxRentalDays.toDouble(),
-            value: _rentalDays.toDouble(),
-            divisions: AppConstants.maxRentalDays - AppConstants.minRentalDays,
-            label: '$_rentalDays ngày',
-            onChanged: (value) {
-              setState(() {
-                _rentalDays = value.round();
-              });
-            },
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_formatDate(_rentalRange.start)} - ${_formatDate(_rentalRange.end)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _pickRentalRange,
+                      child: const Text('Chọn lịch'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Tổng số ngày thuê: $_rentalDays ngày',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
-          Text('$_rentalDays ngày'),
           const SizedBox(height: 14),
           _PriceRow(
             label: 'Giá thuê',
