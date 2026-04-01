@@ -5,8 +5,11 @@ import 'package:shimmer/shimmer.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../models/favorite_model.dart';
 import '../models/product_model.dart';
+import '../services/auth_service.dart';
 import 'branch_screen.dart';
+import 'product_detail_screen.dart';
 import '../services/firebase_service.dart';
 import '../widgets/common/product_card.dart';
 
@@ -23,13 +26,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
+  final AuthService _authService = AuthService();
   late final _HomeViewModel _viewModel;
+  Set<String> _favoriteProductIds = <String>{};
+  bool _favoriteLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = _HomeViewModel(firebaseService: FirebaseService())
+    _viewModel = _HomeViewModel(firebaseService: _firebaseService)
       ..loadProducts();
+    _loadFavorites();
   }
 
   @override
@@ -77,6 +85,74 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _loadFavorites() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _favoriteProductIds = <String>{};
+      });
+      return;
+    }
+
+    final favorites = await _firebaseService.getFavoritesByUser(user.uid);
+    if (!mounted) return;
+    setState(() {
+      _favoriteProductIds = favorites.map((item) => item.productId).toSet();
+    });
+  }
+
+  Future<void> _toggleFavorite(Product product) async {
+    if (_favoriteLoading) {
+      return;
+    }
+
+    final user = _authService.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để dùng yêu thích')),
+      );
+      return;
+    }
+
+    setState(() {
+      _favoriteLoading = true;
+    });
+
+    try {
+      final isFavorite = _favoriteProductIds.contains(product.id);
+      if (isFavorite) {
+        await _firebaseService.removeFavorite(user.uid, product.id);
+      } else {
+        await _firebaseService.addFavorite(
+          user.uid,
+          FavoriteModel(
+            productId: product.id,
+            productName: product.name,
+            thumbnailUrl: product.thumbnailUrl,
+            rentalPricePerDay: product.rentalPricePerDay,
+            addedAt: DateTime.now(),
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        if (isFavorite) {
+          _favoriteProductIds.remove(product.id);
+        } else {
+          _favoriteProductIds.add(product.id);
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _favoriteLoading = false;
+        });
+      }
+    }
   }
 
   Widget _buildBodyByState() {
@@ -131,11 +207,14 @@ class _HomeScreenState extends State<HomeScreen> {
               return ProductCard(
                 product: product,
                 onTap: () {
-                  // TODO: Navigate to product detail screen.
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ProductDetailScreen(product: product),
+                    ),
+                  );
                 },
-                onFavoriteTap: () {
-                  // TODO: Add/remove favorite.
-                },
+                onFavoriteTap: () => _toggleFavorite(product),
+                isFavorite: _favoriteProductIds.contains(product.id),
               );
             },
           );

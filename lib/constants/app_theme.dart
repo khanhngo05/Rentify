@@ -46,9 +46,7 @@ class AppTheme {
         color: AppColors.card,
         elevation: 2,
         shadowColor: AppColors.primary.withValues(alpha: 0.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       ),
 
@@ -92,7 +90,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceVariant,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -128,10 +129,36 @@ class AppTheme {
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: TextStyle(
-          fontFamily: fontFamily,
-          fontSize: 12,
-        ),
+        unselectedLabelStyle: TextStyle(fontFamily: fontFamily, fontSize: 12),
+      ),
+
+      // ── NavigationBar (Material 3) ─────────────────────────
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.15),
+        surfaceTintColor: Colors.transparent,
+        iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.primary);
+          }
+          return const IconThemeData(color: AppColors.textSecondary);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontFamily: fontFamily,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            );
+          }
+          return const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          );
+        }),
       ),
 
       // ── Chip ────────────────────────────────────────────────
@@ -143,9 +170,7 @@ class AppTheme {
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
 
