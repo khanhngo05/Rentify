@@ -32,7 +32,7 @@ class ProductCard extends StatelessWidget {
           children: [
             // ── Ảnh sản phẩm (tăng không gian ảnh, giảm phần thông tin)
             Expanded(
-              flex: 4,
+              flex: 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -94,27 +94,27 @@ class ProductCard extends StatelessWidget {
 
             // ── Thông tin sản phẩm (giảm khoảng trống bên trong)
             Expanded(
-              flex: 1,
+              flex: 2,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Tên sản phẩm
-                    Flexible(
+                    Expanded(
                       child: Text(
                         product.name,
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
-                          height: 1.0,
+                          height: 1.15,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
 
                     // Đánh giá
                     Row(
@@ -128,7 +128,7 @@ class ProductCard extends StatelessWidget {
                         Text(
                           product.rating.toStringAsFixed(1),
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -137,13 +137,13 @@ class ProductCard extends StatelessWidget {
                         Text(
                           '(${product.reviewCount})',
                           style: const TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: AppColors.textHint,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
 
                     // Giá thuê (số màu primary, đơn vị màu phụ)
                     RichText(
@@ -154,7 +154,7 @@ class ProductCard extends StatelessWidget {
                               product.rentalPricePerDay,
                             ),
                             style: const TextStyle(
-                              fontSize: 13,
+                              fontSize: 18,
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
@@ -162,7 +162,7 @@ class ProductCard extends StatelessWidget {
                           TextSpan(
                             text: '/ngày',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: AppColors.textHint,
                               fontWeight: FontWeight.w600,
                             ),

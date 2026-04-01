@@ -17,12 +17,12 @@ class CategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: categories.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final key = categories[i];
           final isSelected = selected == key;
@@ -42,9 +42,14 @@ class CategoryChips extends StatelessWidget {
             onSelected: (_) => onSelected(key),
             backgroundColor: AppColors.surfaceVariant,
             selectedColor: AppColors.primary,
-            shape: const StadiumBorder(),
-            elevation: isSelected ? 2 : 0,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+            shape: StadiumBorder(
+              side: BorderSide(
+                color: isSelected ? AppColors.primary : AppColors.border,
+                width: isSelected ? 0 : 1,
+              ),
+            ),
+            elevation: isSelected ? 1 : 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
             visualDensity: VisualDensity.compact,
           );
         },

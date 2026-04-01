@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../viewmodels/history_view_model.dart';
+
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
+
+  final HistoryViewModel _viewModel = const HistoryViewModel();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Lịch sử')),
-      body: const Center(child: Text('Không có lịch sử nào.')),
+      appBar: AppBar(title: Text(_viewModel.title)),
+      body: Center(child: Text(_viewModel.emptyMessage)),
     );
   }
 }

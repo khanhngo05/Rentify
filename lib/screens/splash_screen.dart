@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../viewmodels/splash_view_model.dart';
 import 'home_screen.dart';
 
 /// Splash screen that displays app logo and name, then navigates to Home.
@@ -17,18 +17,22 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-
-  Duration get _duration => widget.splashDuration ?? const Duration(seconds: 2);
+  late final SplashViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _viewModel = SplashViewModel(splashDuration: widget.splashDuration);
+    _viewModel.addListener(_onViewModelChanged);
+    _viewModel.start();
   }
 
-  void _startTimer() {
-    _timer = Timer(_duration, _goHome);
+  void _onViewModelChanged() {
+    if (!mounted || !_viewModel.navigateToHome) {
+      return;
+    }
+    _viewModel.markNavigationHandled();
+    _goHome();
   }
 
   void _goHome() {
@@ -40,7 +44,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _viewModel.removeListener(_onViewModelChanged);
+    _viewModel.dispose();
     super.dispose();
   }
 
@@ -48,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     // Simple circular logo made from the primary color and app initial.
     return GestureDetector(
-      onTap: _goHome, // allow tap to skip the long wait
+      onTap: _viewModel.skip, // allow tap to skip the long wait
       child: Scaffold(
         backgroundColor: AppColors.surface,
         body: SafeArea(
@@ -97,12 +102,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   style: const TextStyle(fontSize: 14, color: Colors.black54),
                 ),
                 const SizedBox(height: 24),
-                const SizedBox(height: 8),
-                // small hint to user that they can tap to skip
-                TextButton(
-                  onPressed: _goHome,
-                  child: const Text('Bấm để vào ngay'),
-                ),
               ],
             ),
           ),

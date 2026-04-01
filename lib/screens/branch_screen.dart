@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../constants/app_colors.dart';
 import '../models/branch_model.dart';
-import '../services/firebase_service.dart';
+import '../viewmodels/branch_view_model.dart';
 import 'branch_detail_screen.dart';
 
 /// Màn hình hiển thị danh sách chi nhánh gần nhất dựa theo GPS.
@@ -19,12 +19,12 @@ class BranchScreen extends StatefulWidget {
 }
 
 class _BranchScreenState extends State<BranchScreen> {
-  late final _BranchViewModel _viewModel;
+  late final BranchViewModel _viewModel;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = _BranchViewModel()..loadNearestBranches();
+    _viewModel = BranchViewModel()..loadNearestBranches();
   }
 
   @override
@@ -35,13 +35,15 @@ class _BranchScreenState extends State<BranchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Chi nhánh gần bạn')),
       body: AnimatedBuilder(
         animation: _viewModel,
         builder: (context, _) {
           if (_viewModel.state == BranchViewState.loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const _BranchListSkeleton();
           }
 
           if (_viewModel.state == BranchViewState.error) {
@@ -51,93 +53,120 @@ class _BranchScreenState extends State<BranchScreen> {
             );
           }
 
+          final items = _viewModel.visibleBranchDistances;
+
           return RefreshIndicator(
             onRefresh: _viewModel.loadNearestBranches,
-            child: ListView.separated(
+            child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: _viewModel.branchDistances.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final item = _viewModel.branchDistances[index];
-                final branch = item.branch;
-                final todayHours = _viewModel.getTodayHours(branch);
-                final isOpen = _viewModel.isBranchOpenNow(branch);
-                final openLabel = todayHours?.open ?? '--:--';
-                final closeLabel = todayHours?.close ?? '--:--';
-
-                return Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BranchDetailScreen(
-                            branch: branch,
-                            distanceText: item.distanceKmText,
-                            openLabel: openLabel,
-                            closeLabel: closeLabel,
-                            isOpen: isOpen,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.search_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          onChanged: _viewModel.updateSearchQuery,
+                          decoration: const InputDecoration(
+                            hintText: 'Tìm tên chi nhánh hoặc khu vực...',
+                            border: InputBorder.none,
+                            isCollapsed: true,
                           ),
                         ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${branch.name} — cách bạn ${item.distanceKmText}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Giờ mở cửa: $openLabel - $closeLabel',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isOpen
-                                  ? AppColors.success.withValues(alpha: 0.12)
-                                  : AppColors.error.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              isOpen ? 'Đang mở' : 'Đã đóng',
-                              style: TextStyle(
-                                color: isOpen
-                                    ? AppColors.success
-                                    : AppColors.error,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Chạm để xem chi tiết',
-                            style: TextStyle(
-                              color: AppColors.textHint,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    FilterChip(
+                      selected: _viewModel.openNowOnly,
+                      onSelected: _viewModel.setOpenNowOnly,
+                      label: const Text('Đang mở hiện tại'),
+                      avatar: Icon(
+                        Icons.schedule_rounded,
+                        size: 16,
+                        color: _viewModel.openNowOnly
+                            ? AppColors.textOnPrimary
+                            : AppColors.textSecondary,
+                      ),
+                      selectedColor: AppColors.primary,
+                      checkmarkColor: AppColors.textOnPrimary,
+                      labelStyle: TextStyle(
+                        color: _viewModel.openNowOnly
+                            ? AppColors.textOnPrimary
+                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${items.length} chi nhánh',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  _BranchEmptyState(onClearFilters: _viewModel.clearFilters)
+                else
+                  ...List.generate(items.length, (index) {
+                    final item = items[index];
+                    final branch = item.branch;
+                    final todayHours = _viewModel.getTodayHours(branch);
+                    final isOpen = _viewModel.isBranchOpenNow(branch);
+                    final openLabel = todayHours?.open ?? '--:--';
+                    final closeLabel = todayHours?.close ?? '--:--';
+
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == items.length - 1 ? 0 : 12,
+                      ),
+                      child: _BranchCard(
+                        branch: branch,
+                        distanceText: item.distanceKmText,
+                        openLabel: openLabel,
+                        closeLabel: closeLabel,
+                        isOpen: isOpen,
+                        statusDetail: _viewModel.getStatusDetailText(branch),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BranchDetailScreen(
+                                branch: branch,
+                                distanceText: item.distanceKmText,
+                                openLabel: openLabel,
+                                closeLabel: closeLabel,
+                                isOpen: isOpen,
+                              ),
+                            ),
+                          );
+                        },
+                        onDirections: () => _viewModel.openDirections(branch),
+                      ),
+                    );
+                  }),
+              ],
             ),
           );
         },
@@ -146,135 +175,105 @@ class _BranchScreenState extends State<BranchScreen> {
   }
 }
 
-enum BranchViewState { loading, success, error }
+class _BranchListSkeleton extends StatelessWidget {
+  const _BranchListSkeleton();
 
-class _BranchDistanceItem {
-  _BranchDistanceItem({required this.branch, required this.distanceMeters});
-
-  final BranchModel branch;
-  final double distanceMeters;
-
-  String get distanceKmText =>
-      '${(distanceMeters / 1000).toStringAsFixed(1)} km';
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.shimmerBase,
+      highlightColor: AppColors.shimmerHighlight,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+        children: const [
+          _SkeletonBox(height: 46, radius: 16),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              _SkeletonBox(height: 34, width: 150, radius: 999),
+              Spacer(),
+              _SkeletonBox(height: 14, width: 70, radius: 8),
+            ],
+          ),
+          SizedBox(height: 12),
+          _BranchCardSkeleton(),
+          SizedBox(height: 12),
+          _BranchCardSkeleton(),
+          SizedBox(height: 12),
+          _BranchCardSkeleton(),
+        ],
+      ),
+    );
+  }
 }
 
-class _BranchViewModel extends ChangeNotifier {
-  _BranchViewModel({FirebaseService? firebaseService})
-    : _firebaseService = firebaseService ?? FirebaseService();
+class _BranchCardSkeleton extends StatelessWidget {
+  const _BranchCardSkeleton();
 
-  final FirebaseService _firebaseService;
-
-  BranchViewState state = BranchViewState.loading;
-  String errorMessage = '';
-
-  List<_BranchDistanceItem> branchDistances = [];
-
-  DayHours? getTodayHours(BranchModel branch, {DateTime? now}) {
-    final date = now ?? DateTime.now();
-    final dayKey = _weekdayKey(date.weekday);
-    return branch.openingHours[dayKey];
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _SkeletonBox(height: 24, radius: 8)),
+              SizedBox(width: 8),
+              _SkeletonBox(height: 30, width: 66, radius: 999),
+            ],
+          ),
+          SizedBox(height: 10),
+          _SkeletonBox(height: 14, radius: 8),
+          SizedBox(height: 6),
+          _SkeletonBox(height: 14, width: 210, radius: 8),
+          SizedBox(height: 12),
+          _SkeletonBox(height: 14, width: 120, radius: 8),
+          SizedBox(height: 10),
+          Row(
+            children: [
+              _SkeletonBox(height: 30, width: 88, radius: 999),
+              SizedBox(width: 10),
+              Expanded(child: _SkeletonBox(height: 14, radius: 8)),
+            ],
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _SkeletonBox(height: 38, radius: 10)),
+              SizedBox(width: 10),
+              Expanded(child: _SkeletonBox(height: 38, radius: 10)),
+            ],
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  bool isBranchOpenNow(BranchModel branch, {DateTime? now}) {
-    final current = now ?? DateTime.now();
-    final hours = getTodayHours(branch, now: current);
-    if (hours == null || !hours.isOpen) {
-      return false;
-    }
+class _SkeletonBox extends StatelessWidget {
+  const _SkeletonBox({required this.height, this.width, required this.radius});
 
-    final openMinutes = _timeToMinutes(hours.open);
-    final closeMinutes = _timeToMinutes(hours.close);
-    final nowMinutes = current.hour * 60 + current.minute;
+  final double height;
+  final double? width;
+  final double radius;
 
-    // Hỗ trợ ca qua đêm, ví dụ 20:00 -> 02:00.
-    if (closeMinutes < openMinutes) {
-      return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
-    }
-
-    return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
-  }
-
-  int _timeToMinutes(String hhmm) {
-    final parts = hhmm.split(':');
-    if (parts.length != 2) {
-      return 0;
-    }
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-    return hour * 60 + minute;
-  }
-
-  String _weekdayKey(int weekday) {
-    const keys = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    if (weekday < 1 || weekday > 7) {
-      return 'monday';
-    }
-    return keys[weekday - 1];
-  }
-
-  Future<void> loadNearestBranches() async {
-    state = BranchViewState.loading;
-    errorMessage = '';
-    notifyListeners();
-
-    try {
-      final userPosition = await _getCurrentPosition();
-      final branches = await _firebaseService.getBranches();
-
-      final mapped = branches.map((branch) {
-        final distance = Geolocator.distanceBetween(
-          userPosition.latitude,
-          userPosition.longitude,
-          branch.latitude,
-          branch.longitude,
-        );
-
-        return _BranchDistanceItem(branch: branch, distanceMeters: distance);
-      }).toList();
-
-      mapped.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
-
-      branchDistances = mapped;
-      state = BranchViewState.success;
-      notifyListeners();
-    } catch (error) {
-      errorMessage = error.toString().replaceFirst('Exception: ', '');
-      state = BranchViewState.error;
-      notifyListeners();
-    }
-  }
-
-  Future<Position> _getCurrentPosition() async {
-    final isServiceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!isServiceEnabled) {
-      throw Exception('Vui lòng bật dịch vụ định vị (GPS).');
-    }
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied) {
-      throw Exception('Bạn chưa cấp quyền vị trí cho ứng dụng.');
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-        'Quyền vị trí đã bị từ chối vĩnh viễn. Hãy bật lại trong cài đặt.',
-      );
-    }
-
-    return Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(radius),
+      ),
     );
   }
 }
@@ -311,6 +310,244 @@ class _BranchErrorState extends StatelessWidget {
               label: const Text('Thử lại'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BranchEmptyState extends StatelessWidget {
+  const _BranchEmptyState({required this.onClearFilters});
+
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.store_mall_directory_outlined,
+            color: AppColors.textHint,
+            size: 30,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Không tìm thấy chi nhánh phù hợp',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Hãy thử từ khóa khác hoặc bỏ lọc "Đang mở hiện tại".',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onClearFilters,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Xóa bộ lọc'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BranchCard extends StatelessWidget {
+  const _BranchCard({
+    required this.branch,
+    required this.distanceText,
+    required this.openLabel,
+    required this.closeLabel,
+    required this.isOpen,
+    required this.statusDetail,
+    required this.onTap,
+    required this.onDirections,
+  });
+
+  final BranchModel branch;
+  final String distanceText;
+  final String openLabel;
+  final String closeLabel;
+  final bool isOpen;
+  final String statusDetail;
+  final VoidCallback onTap;
+  final VoidCallback onDirections;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        branch.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        distanceText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  branch.address,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.access_time_rounded,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$openLabel - $closeLabel',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isOpen
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.error.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        isOpen ? 'Đang mở' : 'Đã đóng',
+                        style: TextStyle(
+                          color: isOpen ? AppColors.success : AppColors.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        statusDetail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onTap,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 36),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.visibility_outlined, size: 16),
+                        label: const Text(
+                          'Xem chi tiết',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: onDirections,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 36),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        icon: const Icon(Icons.route_rounded, size: 16),
+                        label: const Text(
+                          'Chỉ đường',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
