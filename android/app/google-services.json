@@ -12,7 +12,28 @@
           "package_name": "com.rentify.rentify"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "22071167419-9go2hdv201bovq3k2h9q62q0gjt93m6d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rentify.rentify",
+            "certificate_hash": "0968e3ae0c856999016bda5bb21a6302f0fca705"
+          }
+        },
+        {
+          "client_id": "22071167419-n79ppi36p5ommd40javd6vl79fk1mdgq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rentify.rentify",
+            "certificate_hash": "395cedb2b6bddcf1d62cea539d18103008ae0bf8"
+          }
+        },
+        {
+          "client_id": "22071167419-fnrvu5rd5ppl9usaen6bdtg3s3nljp4k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDE6ZF3g57BO3FCcT-C6vun9km94YdOMWs"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "22071167419-fnrvu5rd5ppl9usaen6bdtg3s3nljp4k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
