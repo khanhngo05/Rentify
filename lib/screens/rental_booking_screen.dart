@@ -13,11 +13,17 @@ class RentalBookingScreen extends StatefulWidget {
     required this.product,
     required this.selectedSize,
     required this.selectedColor,
+    this.initialUserName,
+    this.initialUserPhone,
+    this.initialUserAddress,
   });
 
   final Product product;
   final String selectedSize;
   final String selectedColor;
+  final String? initialUserName;
+  final String? initialUserPhone;
+  final String? initialUserAddress;
 
   @override
   State<RentalBookingScreen> createState() => _RentalBookingScreenState();
@@ -45,12 +51,9 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     final today = DateTime(now.year, now.month, now.day);
     _rentalRange = DateTimeRange(start: today, end: today);
 
-    // --- CẬP NHẬT MỚI: Lấy thông tin mặc định từ Profile User ---
-    // TODO: Chờ P5 (Bảo) hoàn thiện Auth và Profile để lấy data thật từ Firebase
-    // Tạm thời dùng mock data để hiển thị đúng UX theo yêu cầu
-    _receiverName = 'Nguyễn Quang Dũng'; 
-    _receiverPhone = '0987654321';
-    _receiverAddress = '175 Tây Sơn, Đống Đa, Hà Nội';
+    _receiverName = widget.initialUserName;
+    _receiverPhone = widget.initialUserPhone;
+    _receiverAddress = widget.initialUserAddress;
   }
   
 
@@ -332,98 +335,69 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  // Nút 1: Thêm vào giỏ hàng
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: AppColors.primary),
-                      ),
-                      icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
-                      label: const Text('Thêm vào giỏ'),
-                      onPressed: () {
-                        if (!_hasReceiverInfo) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng chọn địa chỉ nhận đồ!'), backgroundColor: Colors.red),
-                          );
-                          return;
-                        }
-
-                        // Map dữ liệu và đẩy vào Provider
-                        final newItem = CartItem(
-                          productId: widget.product.id, 
-                          productName: widget.product.name,
-                          imageUrl: widget.product.thumbnailUrl,
-                          size: widget.selectedSize,
-                          color: widget.selectedColor,
-                          startDate: _rentalRange.start,
-                          endDate: _rentalRange.end,
-                          days: _rentalDays,
-                          pricePerDay: widget.product.rentalPricePerDay,
-                          deposit: widget.product.depositAmount,
-                          receiverName: _receiverName!,
-                          receiverPhone: _receiverPhone!,
-                          receiverAddress: _receiverAddress!,
-                          quantity: 1, 
-                        );
-
-                        cartController.addToCart(newItem);
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã thêm sản phẩm vào giỏ hàng!'), backgroundColor: Colors.green),
-                        );
-                        
-                        Navigator.pop(context);
-                      },
-                    ),
+              // Nút bấm đã được gộp lại thành 1 nút duy nhất
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
                   ),
-                  const SizedBox(width: 12),
-                  
-                  // Nút 2: Tới giỏ hàng
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                  onPressed: () {
+                    if (!_hasReceiverInfo) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng chọn địa chỉ nhận đồ!'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Map dữ liệu và đẩy vào Provider
+                    final newItem = CartItem(
+                      productId: widget.product.id,
+                      productName: widget.product.name,
+                      imageUrl: widget.product.thumbnailUrl,
+                      size: widget.selectedSize,
+                      color: widget.selectedColor,
+                      startDate: _rentalRange.start,
+                      endDate: _rentalRange.end,
+                      days: _rentalDays,
+                      pricePerDay: widget.product.rentalPricePerDay,
+                      deposit: widget.product.depositAmount,
+                      receiverName: _receiverName!,
+                      receiverPhone: _receiverPhone!,
+                      receiverAddress: _receiverAddress!,
+                      quantity: 1,
+                    );
+
+                    cartController.addToCart(newItem);
+
+                    // Hiện thông báo kèm nút bấm "Xem giỏ hàng"
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Đã thêm sản phẩm vào giỏ hàng!'),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 3),
+                        action: SnackBarAction(
+                          label: 'XEM GIỎ HÀNG',
+                          textColor: Colors.white,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const CartScreen()),
+                            );
+                          },
+                        ),
                       ),
-                      onPressed: () {
-                         if (!_hasReceiverInfo) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng chọn địa chỉ nhận đồ!'), backgroundColor: Colors.red),
-                          );
-                          return;
-                        }
+                    );
 
-                        final newItem = CartItem(
-                          productId: widget.product.id, 
-                          productName: widget.product.name,
-                          imageUrl: widget.product.thumbnailUrl,
-                          size: widget.selectedSize,
-                          color: widget.selectedColor,
-                          startDate: _rentalRange.start,
-                          endDate: _rentalRange.end,
-                          days: _rentalDays,
-                          pricePerDay: widget.product.rentalPricePerDay,
-                          deposit: widget.product.depositAmount,
-                          receiverName: _receiverName!,
-                          receiverPhone: _receiverPhone!,
-                          receiverAddress: _receiverAddress!,
-                          quantity: 1,
-                        );
-
-                        cartController.addToCart(newItem);
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CartScreen()),
-                        );
-                      },
-                      child: const Text('Tới giỏ hàng'),
-                    ),
-                  ),
-                ],
+                    // Ẩn form cấu hình và quay lại màn hình chi tiết sản phẩm
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Xác nhận', style: TextStyle(fontSize: 16)),
+                ),
               ),
             ],
           ),
