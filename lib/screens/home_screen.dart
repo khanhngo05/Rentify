@@ -3,13 +3,18 @@ import '../constants/app_colors.dart';
 import '../services/firebase_service.dart';
 import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
+
+// ĐÃ KHÔI PHỤC LẠI ĐẦY ĐỦ CÁC IMPORT QUAN TRỌNG
+import 'branch_screen.dart'; 
+import 'profile_screen.dart'; 
 import 'cart_screen.dart';
 import 'order_screen.dart';
 import 'product_detail_screen.dart';
+import 'messages_screen.dart';
+
 import 'home/widgets/category_chips.dart';
 import 'home/widgets/home_app_bar.dart';
 import 'home/widgets/product_grid_shimmer.dart';
-import 'messages_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Tăng chiều cao lên 120.0 để Quỳnh không bị lỗi "Bottom Overflowed"
   static const double _stickyHeaderHeight = 120.0; 
   late final HomeViewModel _viewModel;
   final TextEditingController _searchController = TextEditingController();
@@ -31,7 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _viewModel.loadProducts();
   }
 
-  void _onModelChanged() { if (mounted) setState(() {}); }
+  void _onModelChanged() { 
+    if (mounted) setState(() {}); 
+  }
 
   @override
   void dispose() {
@@ -43,11 +49,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // FIX LỖI CỦA QUỲNH: Trả lại đúng các Screen cho các Tab
     final pages = <Widget>[
       _buildHomeTab(context),
-      const Center(child: Text('Chi nhánh')),
-      const OrderScreen(), // ĐÃ THAY THẾ HISTORY
-      const Center(child: Text('Tôi')),
+      const BranchScreen(),  // Đã khôi phục màn hình Chi nhánh
+      const OrderScreen(),   // Màn hình Đơn hàng
+      const ProfileScreen(), // Đã khôi phục màn hình Cá nhân
     ];
 
     return Scaffold(
@@ -60,7 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home_rounded), label: 'Trang chủ'),
           BottomNavigationBarItem(icon: Icon(Icons.storefront_outlined), activeIcon: Icon(Icons.storefront_rounded), label: 'Chi nhánh'),
+          
+          // FIX LỖI CỦA KHÁNH: Chắc chắn nhãn ở đây là 'Đơn hàng'
           BottomNavigationBarItem(icon: Icon(Icons.assignment_outlined), activeIcon: Icon(Icons.assignment_rounded), label: 'Đơn hàng'),
+          
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person_rounded), label: 'Tôi'),
         ],
       ),
@@ -72,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           HomeAppBar(
-            // FIX LỖI: Thêm các tham số bắt buộc để hết gạch đỏ
             onCartTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CartScreen())),
             onMessageTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),
             onNotifyTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thông báo'))),
