@@ -8,6 +8,7 @@ import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
 import 'branch_screen.dart';
 import 'history_screen.dart';
+import 'cart_screen.dart'; // Phần cấy thêm: Import màn hình Giỏ hàng của Dũng
 import 'product_detail_screen.dart';
 import 'home/widgets/category_chips.dart';
 import 'home/widgets/home_app_bar.dart';
@@ -94,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
               BottomNavigationBarItem(
                 icon: _buildNavIcon(Icons.history_outlined, false),
                 activeIcon: _buildNavIcon(Icons.history_rounded, true),
-                label: 'Lịch sử',
+                label: 'Đơn hàng', // Phần cấy thêm: Đổi từ Lịch sử -> Đơn hàng
               ),
               BottomNavigationBarItem(
                 icon: _buildNavIcon(Icons.person_outline, false),
@@ -113,9 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           HomeAppBar(
-            onCartTap: () => ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Giỏ hàng'))),
+            // Phần cấy thêm: Gọi sang màn hình Giỏ hàng thay vì hiện SnackBar
+            onCartTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            ),
             onMessageTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),

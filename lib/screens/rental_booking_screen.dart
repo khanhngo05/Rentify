@@ -6,8 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
 
 class RentalBookingScreen extends StatefulWidget {
-  // Biến thành tham số tùy chọn (?) để Giang có thể truyền vào từ luồng "Thuê ngay",
-  // trong khi luồng "Giỏ hàng" của bạn thì để trống (null).
   final dynamic product; 
   final String? selectedSize;
   final String? selectedColor;
@@ -38,7 +36,6 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     _fetchUserData();
   }
 
-  // Tự động lấy thông tin từ Firebase để fill sẵn địa chỉ
   Future<void> _fetchUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -71,8 +68,6 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     }
   }
 
-  // Logic tạo đơn hàng hoàn thiện
-// Logic tạo đơn hàng hoàn thiện
   Future<void> _submitOrder() async {
     if (_selectedDateRange == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn thời gian thuê!')));
@@ -92,24 +87,22 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       double totalRental = 0;
       double totalDeposit = 0;
 
-      // XỬ LÝ LOGIC 2 LUỒNG ĐỘC LẬP
       if (widget.product != null) {
-        // Luồng 1: Thuê 1 món từ Detail của Giang
-        double price = (widget.product.rentalPrice ?? 0).toDouble();
-        double deposit = (widget.product.depositPrice ?? 0).toDouble();
+        // Đã sửa lại đúng tên biến của P1: rentalPricePerDay và depositAmount
+        double price = (widget.product.rentalPricePerDay ?? 0).toDouble();
+        double deposit = (widget.product.depositAmount ?? 0).toDouble();
         
         orderItems.add({
           'productId': widget.product.id ?? '',
           'productName': widget.product.name ?? 'Sản phẩm thuê',
-          'size': widget.selectedSize ?? 'Free',       // Đã sửa thành widget.selectedSize
-          'color': widget.selectedColor ?? 'Mặc định', // Đã sửa thành widget.selectedColor
+          'size': widget.selectedSize ?? 'Free',
+          'color': widget.selectedColor ?? 'Mặc định',
           'quantity': 1,
           'pricePerDay': price,
         });
         totalRental = price;
         totalDeposit = deposit;
       } else {
-        // Luồng 2: Thuê tất cả từ Giỏ hàng của bạn
         orderItems = cartProvider.cartItems.map((item) => {
           'productId': item.productId,
           'productName': item.productName,
@@ -122,7 +115,6 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         totalDeposit = cartProvider.totalDepositPrice;
       }
 
-      // Tạo cấu trúc Order chuẩn để truyền lại cho Bảo (P5) hiển thị Lịch sử
       final orderData = {
         'userId': user?.uid ?? 'guest',
         'items': orderItems,
@@ -133,14 +125,12 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         'rentalDays': _rentalDays,
         'totalRentalPrice': totalRental * _rentalDays,
         'totalDepositPrice': totalDeposit,
-        'status': 'pending', // Khởi tạo: Chờ xác nhận
+        'status': 'pending', 
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Đẩy lên Firestore
       DocumentReference docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
 
-      // Nếu đi từ giỏ hàng thì xóa sạch giỏ
       if (widget.product == null) {
         cartProvider.clearCart();
       }
@@ -150,7 +140,6 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         SnackBar(content: Text('Tạo đơn thành công! Mã đơn: ${docRef.id}')),
       );
       
-      // Chuyển sang trang Lịch sử của P5
       context.go('/history'); 
 
     } catch (e) {
@@ -159,15 +148,16 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    // Tự động tính tiền hiển thị real-time
     final cartProvider = context.watch<CartProvider>();
+    // Đã sửa lại đúng tên biến của P1 để hiển thị real-time không bị crash
     double displayRental = widget.product != null 
-        ? (widget.product.rentalPrice ?? 0).toDouble() * _rentalDays 
+        ? (widget.product.rentalPricePerDay ?? 0).toDouble() * _rentalDays 
         : cartProvider.totalRentalPrice * _rentalDays;
     double displayDeposit = widget.product != null 
-        ? (widget.product.depositPrice ?? 0).toDouble()
+        ? (widget.product.depositAmount ?? 0).toDouble()
         : cartProvider.totalDepositPrice;
 
     return Scaffold(
