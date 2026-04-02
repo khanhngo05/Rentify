@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
+import '../controllers/cart_controller.dart';
+import 'cart_screen.dart'; // Thêm dòng import này để chuyển trang
+import 'cart_screen.dart';
 
 class RentalBookingScreen extends StatefulWidget {
   const RentalBookingScreen({
@@ -43,6 +46,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     final today = DateTime(now.year, now.month, now.day);
     _rentalRange = DateTimeRange(start: today, end: today);
   }
+  
 
   String _formatDate(DateTime date) {
     return DateFormat(AppConstants.dateFormat).format(date);
@@ -331,10 +335,43 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                     backgroundColor: AppColors.primary,
                   ),
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đã chuyển sang màn thuê (P4).'),
-                      ),
+                    // 1. Kiểm tra xem người dùng đã nhập thông tin nhận hàng chưa
+                    if (!_hasReceiverInfo) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng chọn địa chỉ nhận đồ ở phía trên!'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    // 2. Map dữ liệu vào CartItem
+                    // Lưu ý: Đảm bảo 'id' là tên thuộc tính đúng trong Product model của P1. 
+                    // Nếu P1 đặt tên là 'productId' hay gì khác thì bạn sửa lại nhé.
+                    final newItem = CartItem(
+                      productId: widget.product.id, 
+                      productName: widget.product.name,
+                      imageUrl: widget.product.thumbnailUrl,
+                      size: widget.selectedSize,
+                      color: widget.selectedColor,
+                      startDate: _rentalRange.start,
+                      endDate: _rentalRange.end,
+                      days: _rentalDays,
+                      pricePerDay: widget.product.rentalPricePerDay,
+                      deposit: widget.product.depositAmount,
+                      receiverName: _receiverName!,
+                      receiverPhone: _receiverPhone!,
+                      receiverAddress: _receiverAddress!,
+                    );
+
+                    // 3. Đẩy vào Giỏ hàng toàn cục
+                    cartController.addToCart(newItem);
+
+                    // 4. Chuyển hướng sang màn hình Giỏ hàng
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CartScreen()),
                     );
                   },
                   child: const Text('Đặt thuê'),
