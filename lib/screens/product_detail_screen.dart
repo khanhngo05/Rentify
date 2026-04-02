@@ -480,6 +480,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
+// ... các phần import và code bên trên giữ nguyên
+
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -493,6 +495,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           product: product,
                           selectedSize: _selectedSize,
                           selectedColor: _selectedColor,
+                          isRentNow: true, // FIX: Thêm dòng này để hết lỗi đỏ
                         ),
                       ),
                     );
@@ -505,6 +508,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 }
+
+// ... các Widget MetaChip, OptionSelector giữ nguyên
 
 class _MetaChip extends StatelessWidget {
   const _MetaChip({required this.label});
