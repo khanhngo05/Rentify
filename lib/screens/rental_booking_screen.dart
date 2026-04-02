@@ -23,6 +23,15 @@ class RentalBookingScreen extends StatefulWidget {
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
   late DateTimeRange _rentalRange;
+  String? _receiverName;
+  String? _receiverPhone;
+  String? _receiverAddress;
+
+  bool get _hasReceiverInfo {
+    return (_receiverName?.trim().isNotEmpty ?? false) &&
+        (_receiverPhone?.trim().isNotEmpty ?? false) &&
+        (_receiverAddress?.trim().isNotEmpty ?? false);
+  }
 
   int get _rentalDays =>
       _rentalRange.end.difference(_rentalRange.start).inDays + 1;
@@ -39,6 +48,25 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     return DateFormat(AppConstants.dateFormat).format(date);
   }
 
+  Future<void> _showAddressDialog() async {
+    final receiverInfo = await showDialog<_ReceiverInfo>(
+      context: context,
+      builder: (_) => _AddressInputDialog(
+        initialName: _receiverName,
+        initialPhone: _receiverPhone,
+        initialAddress: _receiverAddress,
+      ),
+    );
+
+    if (!mounted || receiverInfo == null) return;
+
+    setState(() {
+      _receiverName = receiverInfo.name;
+      _receiverPhone = receiverInfo.phone;
+      _receiverAddress = receiverInfo.address;
+    });
+  }
+
   Future<void> _pickRentalRange() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -48,10 +76,10 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
       initialDateRange: _rentalRange,
-      helpText: 'Chon ngay thue',
-      confirmText: 'Xac nhan',
-      cancelText: 'Huy',
-      saveText: 'Luu',
+      helpText: 'Chọn ngày thuê',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+      saveText: 'Lưu',
     );
 
     if (picked == null) return;
@@ -62,7 +90,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Vui long chon tu ${AppConstants.minRentalDays} den ${AppConstants.maxRentalDays} ngay.',
+            'Vui lòng chọn từ ${AppConstants.minRentalDays} đến ${AppConstants.maxRentalDays} ngày.',
           ),
         ),
       );
@@ -80,35 +108,64 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     final total = rentalFee + widget.product.depositAmount;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thue ngay')),
+      appBar: AppBar(title: const Text('Thuê ngay')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
-          const _SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.location_on_rounded, color: AppColors.primary),
-                    SizedBox(width: 8),
+          GestureDetector(
+            onTap: _showAddressDialog,
+            child: _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_rounded,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Địa chỉ nhận đồ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textHint,
+                        size: 22,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_hasReceiverInfo) ...[
                     Text(
-                      'Dia chi nhan do',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      '${_receiverName!}  •  ${_receiverPhone!}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Le Thu Giang  �  0378 122 051',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Duong Co Bong, Doi 7 Tho Xuan, Huyen Dan Phuong, Ha Noi',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ],
+                    const SizedBox(height: 2),
+                    Text(
+                      _receiverAddress!,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ] else
+                    const Text(
+                      'Chọn địa chỉ',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -117,7 +174,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'San pham thue',
+                  'Sản phẩm thuê',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -155,13 +212,17 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Size: ${widget.selectedSize.isEmpty ? 'Chua chon' : widget.selectedSize}',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            'Size: ${widget.selectedSize.isEmpty ? 'Chưa chọn' : widget.selectedSize}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Mau: ${widget.selectedColor.isEmpty ? 'Chua chon' : widget.selectedColor}',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            'Màu: ${widget.selectedColor.isEmpty ? 'Chưa chọn' : widget.selectedColor}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -177,7 +238,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Thoi gian thue',
+                  'Thời gian thuê',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -191,14 +252,18 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    TextButton(
+                    FilledButton(
                       onPressed: _pickRentalRange,
-                      child: const Text('Chon lich'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text('Chọn lịch'),
                     ),
                   ],
                 ),
                 Text(
-                  'Tong so ngay thue: $_rentalDays ngay',
+                  'Tổng số ngày thuê: $_rentalDays ngày',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
               ],
@@ -209,21 +274,21 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
             child: Column(
               children: [
                 _PriceRow(
-                  label: 'Gia thue',
+                  label: 'Giá thuê',
                   value:
-                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngay',
+                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngày',
                 ),
                 _PriceRow(
-                  label: 'Phi thue ($_rentalDays ngay)',
+                  label: 'Phí thuê ($_rentalDays ngày)',
                   value: AppConstants.formatPrice(rentalFee),
                 ),
                 _PriceRow(
-                  label: 'Tien dat coc',
+                  label: 'Tiền đặt cọc',
                   value: AppConstants.formatPrice(widget.product.depositAmount),
                 ),
                 const Divider(height: 20),
                 _PriceRow(
-                  label: 'Tong tam tinh',
+                  label: 'Tổng tạm tính',
                   value: AppConstants.formatPrice(total),
                   isEmphasized: true,
                 ),
@@ -244,7 +309,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Tong cong',
+                      'Tổng cộng',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     Text(
@@ -262,12 +327,17 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Da chuyen sang man thue (P4).')),
+                      const SnackBar(
+                        content: Text('Đã chuyển sang màn thuê (P4).'),
+                      ),
                     );
                   },
-                  child: const Text('Dat thue'),
+                  child: const Text('Đặt thuê'),
                 ),
               ),
             ],
@@ -293,6 +363,136 @@ class _SectionCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: child,
+    );
+  }
+}
+
+class _ReceiverInfo {
+  const _ReceiverInfo({
+    required this.name,
+    required this.phone,
+    required this.address,
+  });
+
+  final String name;
+  final String phone;
+  final String address;
+}
+
+class _AddressInputDialog extends StatefulWidget {
+  const _AddressInputDialog({
+    this.initialName,
+    this.initialPhone,
+    this.initialAddress,
+  });
+
+  final String? initialName;
+  final String? initialPhone;
+  final String? initialAddress;
+
+  @override
+  State<_AddressInputDialog> createState() => _AddressInputDialogState();
+}
+
+class _AddressInputDialogState extends State<_AddressInputDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _addressController;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName ?? '');
+    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialAddress ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    Navigator.of(context).pop(
+      _ReceiverInfo(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Thông tin nhận hàng'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Họ và tên'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập họ và tên';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập số điện thoại';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _addressController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Địa chỉ nhận hàng',
+                  alignLabelWithHint: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập địa chỉ nhận hàng';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _save,
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 }
