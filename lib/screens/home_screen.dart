@@ -7,8 +7,8 @@ import '../services/firebase_service.dart';
 import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
 import 'branch_screen.dart';
-import 'history_screen.dart';
-import 'cart_screen.dart'; // Import màn hình Giỏ hàng của Dũng
+import 'history_screen.dart'; // Trả lại file của Bảo
+import 'cart_screen.dart'; 
 import 'product_detail_screen.dart';
 import 'home/widgets/category_chips.dart';
 import 'home/widgets/home_app_bar.dart';
@@ -66,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = <Widget>[
       _buildHomeTab(context),
       const BranchScreen(),
-      const CartScreen(), // Đã thay HistoryScreen bằng CartScreen của Dũng
+      const HistoryScreen(), // Đã trả lại HistoryScreen của Bảo
       const ProfileScreen(),
     ];
 
@@ -93,10 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Chi nhánh',
               ),
               BottomNavigationBarItem(
-                // Đổi icon và label thành Giỏ hàng theo ý Khánh
-                icon: _buildNavIcon(Icons.shopping_cart_outlined, false),
-                activeIcon: _buildNavIcon(Icons.shopping_cart_rounded, true),
-                label: 'Giỏ hàng', 
+                // Đổi icon thành icon đơn hàng và label thành Đơn hàng
+                icon: _buildNavIcon(Icons.receipt_long_outlined, false),
+                activeIcon: _buildNavIcon(Icons.receipt_long_rounded, true),
+                label: 'Đơn hàng', 
               ),
               BottomNavigationBarItem(
                 icon: _buildNavIcon(Icons.person_outline, false),
@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           HomeAppBar(
-            // Vẫn giữ tính năng bấm icon giỏ hàng trên top đẩy sang CartScreen
+            // Giỏ hàng vẫn nằm ở đây (top right)
             onCartTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CartScreen()),
             ),

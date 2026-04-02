@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
 
 class RentalBookingScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class RentalBookingScreen extends StatefulWidget {
 }
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
-  // Thêm Controller cho Tên và Số điện thoại
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
@@ -40,7 +38,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     _fetchUserData();
   }
 
-  // Cập nhật hàm lấy toàn bộ thông tin User từ Firestore
+  // Tự động lấy dữ liệu User từ Firestore để điền vào Form
   Future<void> _fetchUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -96,6 +94,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       double totalDeposit = 0;
 
       if (widget.product != null) {
+        // Luồng 1: Thuê 1 món trực tiếp từ Detail
         double price = (widget.product.rentalPricePerDay ?? 0).toDouble();
         double deposit = (widget.product.depositAmount ?? 0).toDouble();
         
@@ -106,11 +105,12 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
           'color': widget.selectedColor ?? 'Mặc định',
           'quantity': 1,
           'pricePerDay': price,
-          'imageUrl': widget.product.thumbnailUrl ?? '', // Lưu thêm ảnh để hiển thị lịch sử
+          'imageUrl': widget.product.thumbnailUrl ?? '', 
         });
         totalRental = price;
         totalDeposit = deposit;
       } else {
+        // Luồng 2: Thuê từ Giỏ hàng
         orderItems = cartProvider.cartItems.map((item) => {
           'productId': item.productId,
           'productName': item.productName,
@@ -124,7 +124,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         totalDeposit = cartProvider.totalDepositPrice;
       }
 
-      // Lưu thêm customerName và phone vào cấu trúc Order
+      // Đóng gói data đẩy lên Firestore
       final orderData = {
         'userId': user?.uid ?? 'guest',
         'customerName': _nameController.text.trim(),
@@ -143,6 +143,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
 
       DocumentReference docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
 
+      // Xóa giỏ hàng nếu đi từ luồng giỏ hàng
       if (widget.product == null) {
         cartProvider.clearCart();
       }
@@ -152,7 +153,8 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         SnackBar(content: Text('Tạo đơn thành công! Mã đơn: ${docRef.id}')),
       );
       
-      context.go('/history'); 
+      // Đưa user về trang chủ thay vì dùng go_router gây crash
+      Navigator.of(context).popUntil((route) => route.isFirst);
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi chốt đơn: $e')));
@@ -161,10 +163,9 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     }
   }
 
-  // Hàm render danh sách sản phẩm hiển thị trên giao diện
+  // Widget hiển thị danh sách sản phẩm thu nhỏ
   Widget _buildProductList(CartProvider cartProvider) {
     if (widget.product != null) {
-      // Luồng 1: Hiển thị 1 sản phẩm (Từ nút Thuê ngay)
       return ListTile(
         contentPadding: EdgeInsets.zero,
         leading: ClipRRect(
@@ -178,7 +179,6 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         trailing: Text('${widget.product.rentalPricePerDay} đ'),
       );
     } else {
-      // Luồng 2: Hiển thị danh sách từ Giỏ hàng
       return Column(
         children: cartProvider.cartItems.map((item) => ListTile(
           contentPadding: EdgeInsets.zero,
@@ -213,7 +213,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         : ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // 1. CHỌN NGÀY THUÊ
+              // 1. THỜI GIAN THUÊ
               const Text('Thời gian thuê', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Card(
@@ -230,7 +230,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 2. THÔNG TIN SẢN PHẨM (Feedback từ Leader)
+              // 2. THÔNG TIN SẢN PHẨM
               const Text('Thông tin sản phẩm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Container(
@@ -244,7 +244,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 3. THÔNG TIN NGƯỜI ĐẶT & CHI NHÁNH (Feedback từ Leader)
+              // 3. THÔNG TIN NGƯỜI NHẬN
               const Text('Thông tin nhận đồ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
@@ -291,6 +291,8 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+              
+              // 5. NÚT CHỐT ĐƠN
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
