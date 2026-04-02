@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'dart:math';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../controllers/cart_controller.dart';
-import 'cart_screen.dart';
 
 class RentalBookingScreen extends StatefulWidget {
   final Product product; final String selectedSize, selectedColor;
@@ -16,41 +16,43 @@ class RentalBookingScreen extends StatefulWidget {
 }
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
-  late DateTimeRange _rentalRange;
-  String? _n, _p, _a;
-
+  late DateTimeRange _range;
   @override
   void initState() {
     super.initState();
-    _rentalRange = DateTimeRange(start: DateTime.now(), end: DateTime.now());
-    _n = widget.initialUserName; _p = widget.initialUserPhone; _a = widget.initialUserAddress;
+    _range = DateTimeRange(start: DateTime.now(), end: DateTime.now());
+  }
+
+  void _handleAction() {
+    final orderId = 'RTF${Random().nextInt(99999)}';
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
+        content: Text('Tạo đơn thuê thành công!\nMã đơn: $orderId\nTrạng thái: Chờ xác nhận', textAlign: TextAlign.center),
+        actions: [TextButton(onPressed: () => Navigator.popUntil(context, (r) => r.isFirst), child: const Text('Về trang chủ'))],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final days = _rentalRange.end.difference(_rentalRange.start).inDays + 1;
-    final total = (widget.product.rentalPricePerDay * days) + widget.product.depositAmount;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Xác nhận thuê')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        ListTile(title: const Text('Người nhận'), subtitle: Text('$_n - $_p\n$_a'), tileColor: Colors.grey[100]),
-        const SizedBox(height: 12),
-        ListTile(title: Text(widget.product.name), subtitle: Text('Size: ${widget.selectedSize} | Ngày: $days'), trailing: Text(AppConstants.formatPrice(total))),
-      ]),
+      appBar: AppBar(title: const Text('Cấu hình đơn thuê')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ListTile(title: const Text('Người nhận'), subtitle: Text('${widget.initialUserName ?? "Dũng Nguyễn"} - ${widget.initialUserPhone ?? ""}')),
+          const Divider(),
+          Text(widget.product.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         child: FilledButton(
-          onPressed: () {
-            if (_n == null) return;
-            // GIẢ LẬP TẠO ĐƠN THÀNH CÔNG (Yêu cầu 6)
-            showDialog(context: context, builder: (c) => AlertDialog(
-              title: const Icon(Icons.check_circle, color: Colors.green, size: 50),
-              content: Text('Tạo đơn thuê thành công!\nMã đơn: RTF${Random().nextInt(99999)}\nTrạng thái: Chờ xác nhận', textAlign: TextAlign.center),
-              actions: [TextButton(onPressed: () => Navigator.popUntil(context, (r) => r.isFirst), child: const Text('Về trang chủ'))],
-            ));
-          },
-          child: const Text('Xác nhận thuê ngay'),
+          onPressed: _handleAction,
+          child: const Text('Thêm vào giỏ hàng'), // ĐÃ KHÔI PHỤC TÊN NÚT
         ),
       ),
     );
