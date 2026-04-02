@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../models/branch_model.dart';
 import '../models/favorite_model.dart';
 import '../models/product_model.dart';
 import '../services/auth_service.dart';
@@ -27,6 +28,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   String _selectedSize = '';
   String _selectedColor = '';
+  List<BranchModel> _branches = <BranchModel>[];
+  BranchModel? _selectedBranch;
+  bool _isLoadingBranches = false;
 
   bool _isFavorite = false;
   bool _favoriteLoading = false;
@@ -42,6 +46,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _selectedColor = widget.product.colors.isNotEmpty
         ? widget.product.colors.first
         : '';
+    _loadBranches();
     _loadFavoriteStatus();
   }
 
@@ -119,6 +124,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _favoriteLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadBranches() async {
+    setState(() {
+      _isLoadingBranches = true;
+    });
+
+    try {
+      final branches = await _firebaseService.getBranches();
+      if (!mounted) return;
+      setState(() {
+        _branches = branches;
+        if (branches.isNotEmpty) {
+          _selectedBranch = branches.first;
+        }
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingBranches = false;
+      });
     }
   }
 
@@ -292,6 +319,84 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
+                const Text(
+                  'Chọn chi nhánh nhận đồ',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                if (_isLoadingBranches)
+                  const LinearProgressIndicator(minHeight: 3)
+                else if (_branches.isEmpty)
+                  const Text(
+                    'Chưa có chi nhánh khả dụng',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  )
+                else ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _branches.map((branch) {
+                      final isSelected = _selectedBranch?.id == branch.id;
+                      return ChoiceChip(
+                        label: Text(branch.name),
+                        showCheckmark: isSelected,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: Colors.white,
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? Colors.transparent
+                              : AppColors.border,
+                        ),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() {
+                            _selectedBranch = branch;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  if (_selectedBranch != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedBranch!.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _selectedBranch!.address,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Hotline: ${_selectedBranch!.phone}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     const Icon(Icons.star_rounded, color: AppColors.star),
@@ -316,6 +421,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -389,6 +495,17 @@ class _OptionSelector extends StatelessWidget {
               final isActive = option == selected;
               return ChoiceChip(
                 label: Text(option),
+                showCheckmark: isActive,
+                checkmarkColor: Colors.white,
+                backgroundColor: Colors.white,
+                selectedColor: AppColors.primary,
+                labelStyle: TextStyle(
+                  color: isActive ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w600,
+                ),
+                side: BorderSide(
+                  color: isActive ? Colors.transparent : AppColors.border,
+                ),
                 selected: isActive,
                 onSelected: (_) => onSelected(option),
               );

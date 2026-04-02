@@ -48,10 +48,10 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       firstDate: today,
       lastDate: today.add(const Duration(days: 365)),
       initialDateRange: _rentalRange,
-      helpText: 'Chon ngay thue',
-      confirmText: 'Xac nhan',
-      cancelText: 'Huy',
-      saveText: 'Luu',
+      helpText: 'Chọn ngày thuê',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+      saveText: 'Lưu',
     );
 
     if (picked == null) return;
@@ -62,7 +62,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Vui long chon tu ${AppConstants.minRentalDays} den ${AppConstants.maxRentalDays} ngay.',
+            'Vui lòng chọn từ ${AppConstants.minRentalDays} đến ${AppConstants.maxRentalDays} ngày.',
           ),
         ),
       );
@@ -80,33 +80,45 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
     final total = rentalFee + widget.product.depositAmount;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thue ngay')),
+      appBar: AppBar(title: const Text('Thuê ngay')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
-          const _SectionCard(
+          _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.location_on_rounded, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Dia chi nhan do',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_rounded, color: AppColors.error),
+                        SizedBox(width: 8),
+                        Text(
+                          'Địa chỉ nhận hàng',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.textHint,
+                      size: 22,
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Le Thu Giang  �  0378 122 051',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Duong Co Bong, Doi 7 Tho Xuan, Huyen Dan Phuong, Ha Noi',
-                  style: TextStyle(color: AppColors.textSecondary),
+                const SizedBox(height: 8),
+                const Text(
+                  'Chọn địa chỉ',
+                  style: TextStyle(
+                    color: AppColors.error,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -117,7 +129,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'San pham thue',
+                  'Sản phẩm thuê',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -155,13 +167,17 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Size: ${widget.selectedSize.isEmpty ? 'Chua chon' : widget.selectedSize}',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            'Size: ${widget.selectedSize.isEmpty ? 'Chưa chọn' : widget.selectedSize}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Mau: ${widget.selectedColor.isEmpty ? 'Chua chon' : widget.selectedColor}',
-                            style: const TextStyle(color: AppColors.textSecondary),
+                            'Màu: ${widget.selectedColor.isEmpty ? 'Chưa chọn' : widget.selectedColor}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
                       ),
@@ -177,7 +193,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Thoi gian thue',
+                  'Thời gian thuê',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -191,14 +207,18 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
-                    TextButton(
+                    FilledButton(
                       onPressed: _pickRentalRange,
-                      child: const Text('Chon lich'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text('Chọn lịch'),
                     ),
                   ],
                 ),
                 Text(
-                  'Tong so ngay thue: $_rentalDays ngay',
+                  'Tổng số ngày thuê: $_rentalDays ngày',
                   style: const TextStyle(color: AppColors.textSecondary),
                 ),
               ],
@@ -209,21 +229,21 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
             child: Column(
               children: [
                 _PriceRow(
-                  label: 'Gia thue',
+                  label: 'Giá thuê',
                   value:
-                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngay',
+                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngày',
                 ),
                 _PriceRow(
-                  label: 'Phi thue ($_rentalDays ngay)',
+                  label: 'Phí thuê ($_rentalDays ngày)',
                   value: AppConstants.formatPrice(rentalFee),
                 ),
                 _PriceRow(
-                  label: 'Tien dat coc',
+                  label: 'Tiền đặt cọc',
                   value: AppConstants.formatPrice(widget.product.depositAmount),
                 ),
                 const Divider(height: 20),
                 _PriceRow(
-                  label: 'Tong tam tinh',
+                  label: 'Tổng tạm tính',
                   value: AppConstants.formatPrice(total),
                   isEmphasized: true,
                 ),
@@ -244,7 +264,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Tong cong',
+                      'Tổng cộng',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     Text(
@@ -262,12 +282,17 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Da chuyen sang man thue (P4).')),
+                      const SnackBar(
+                        content: Text('Đã chuyển sang màn thuê (P4).'),
+                      ),
                     );
                   },
-                  child: const Text('Dat thue'),
+                  child: const Text('Đặt thuê'),
                 ),
               ),
             ],
