@@ -29,6 +29,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String _selectedSize = '';
   String _selectedColor = '';
   List<BranchModel> _branches = <BranchModel>[];
+  Map<String, BranchInventory> _inventoryByBranch = <String, BranchInventory>{};
   BranchModel? _selectedBranch;
   bool _isLoadingBranches = false;
 
@@ -134,19 +135,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     try {
       final branches = await _firebaseService.getBranches();
+      final inventoryResults = await Future.wait(
+        branches.map(
+          (branch) => _firebaseService.getProductInventory(
+            branch.id,
+            widget.product.id,
+          ),
+        ),
+      );
+      final inventoryByBranch = <String, BranchInventory>{};
+      for (var i = 0; i < branches.length; i++) {
+        final inventory = inventoryResults[i];
+        if (inventory != null) {
+          inventoryByBranch[branches[i].id] = inventory;
+        }
+      }
+
       if (!mounted) return;
+      BranchModel? selectedBranch;
+      if (branches.isNotEmpty) {
+        selectedBranch = branches.firstWhere(
+          (branch) => (inventoryByBranch[branch.id]?.availableStock ?? 0) > 0,
+          orElse: () => branches.first,
+        );
+      }
+
       setState(() {
         _branches = branches;
-        if (branches.isNotEmpty) {
-          _selectedBranch = branches.first;
-        }
+        _inventoryByBranch = inventoryByBranch;
+        _selectedBranch = selectedBranch;
       });
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không thể tải dữ liệu chi nhánh/tồn kho');
     } finally {
       if (!mounted) return;
       setState(() {
         _isLoadingBranches = false;
       });
     }
+  }
+
+  int _availableStockForBranch(String branchId) {
+    return _inventoryByBranch[branchId]?.availableStock ?? 0;
+  }
+
+  bool _isOutOfStock(String branchId) {
+    return _availableStockForBranch(branchId) <= 0;
   }
 
   void _showMessage(String text) {
@@ -156,6 +191,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final canRent =
+        _selectedBranch != null && !_isOutOfStock(_selectedBranch!.id);
 
     return Scaffold(
       appBar: AppBar(
@@ -337,14 +374,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     runSpacing: 8,
                     children: _branches.map((branch) {
                       final isSelected = _selectedBranch?.id == branch.id;
+                      final availableStock = _availableStockForBranch(
+                        branch.id,
+                      );
+                      final isOutOfStock = availableStock <= 0;
                       return ChoiceChip(
-                        label: Text(branch.name),
+                        label: Text(
+                          '${branch.name} • ${isOutOfStock ? 'Hết hàng' : 'Còn $availableStock'}',
+                        ),
                         showCheckmark: isSelected,
                         checkmarkColor: Colors.white,
-                        backgroundColor: Colors.white,
+                        backgroundColor: isOutOfStock
+                            ? AppColors.surfaceVariant
+                            : Colors.white,
                         selectedColor: AppColors.primary,
                         labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black,
+                          color: isSelected
+                              ? Colors.white
+                              : isOutOfStock
+                              ? AppColors.textHint
+                              : Colors.black,
                           fontWeight: FontWeight.w600,
                         ),
                         side: BorderSide(
@@ -353,11 +402,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               : AppColors.border,
                         ),
                         selected: isSelected,
-                        onSelected: (_) {
-                          setState(() {
-                            _selectedBranch = branch;
-                          });
-                        },
+                        onSelected: isOutOfStock
+                            ? null
+                            : (_) {
+                                setState(() {
+                                  _selectedBranch = branch;
+                                });
+                              },
                       );
                     }).toList(),
                   ),
@@ -391,6 +442,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               color: AppColors.textSecondary,
                             ),
                           ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _isOutOfStock(_selectedBranch!.id)
+                                ? 'Tồn kho: Hết hàng'
+                                : 'Tồn kho: Còn ${_availableStockForBranch(_selectedBranch!.id)} sản phẩm',
+                            style: TextStyle(
+                              color: _isOutOfStock(_selectedBranch!.id)
+                                  ? Colors.red
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -422,17 +485,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RentalBookingScreen(
-                    product: product,
-                    selectedSize: _selectedSize,
-                    selectedColor: _selectedColor,
-                  ),
-                ),
-              );
-            },
+            onPressed: canRent
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RentalBookingScreen(
+                          product: product,
+                          selectedSize: _selectedSize,
+                          selectedColor: _selectedColor,
+                        ),
+                      ),
+                    );
+                  }
+                : null,
             child: const Text('Thuê ngay'),
           ),
         ),
