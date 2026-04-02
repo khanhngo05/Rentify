@@ -28,19 +28,16 @@ class _CartScreenState extends State<CartScreen> {
               ...items.map((item) => Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: Image.network(item.thumbnailUrl, width: 50, fit: BoxFit.cover, 
-                    errorBuilder: (_,__,___) => const Icon(Icons.image)),
+                  leading: Image.network(item.thumbnailUrl, width: 50, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.image)),
                   title: Text(item.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('Size: ${item.size} | SL: ${item.quantity}'),
-                  trailing: Text(AppConstants.formatPrice(item.totalItemPrice), 
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  trailing: Text(AppConstants.formatPrice(item.totalItemPrice), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 ),
-              )).toList(), // Phải có .toList() ở đây
+              )),
               const SizedBox(height: 20),
-              const Text('Chọn chi nhánh nhận/trả đồ:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Chọn chi nhánh nhận đồ:', style: TextStyle(fontWeight: FontWeight.bold)),
               DropdownButtonFormField<String>(
                 value: _selectedBranch,
-                decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: _branches.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
                 onChanged: (v) => setState(() => _selectedBranch = v),
               ),
@@ -57,39 +54,16 @@ class _CartScreenState extends State<CartScreen> {
       listenable: cartController,
       builder: (context, _) {
         if (cartController.items.isEmpty) return const SizedBox.shrink();
-        final total = cartController.totalRentalPrice + cartController.totalDeposit;
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Tổng thanh toán:'),
-                  Text(AppConstants.formatPrice(total), 
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: FilledButton(
-                  onPressed: () {
-                    if (_selectedBranch == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn chi nhánh!')));
-                      return;
-                    }
-                    cartController.clearCart();
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đặt đơn hàng chờ xác nhận thành công!')));
-                  },
-                  child: const Text('Xác nhận đặt thuê'),
-                ),
-              ),
-            ],
+          child: FilledButton(
+            onPressed: () {
+              if (_selectedBranch == null) return;
+              cartController.clearCart();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đặt đơn thuê thành công! Chờ xác nhận.')));
+            },
+            child: const Text('Xác nhận đặt thuê'),
           ),
         );
       }
