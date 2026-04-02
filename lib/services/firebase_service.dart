@@ -17,29 +17,64 @@ class FirebaseService {
 
   /// Lấy tất cả sản phẩm đang hoạt động
   Future<List<Product>> getProducts() async {
-    final snapshot = await _db
-        .collection(AppConstants.productsCollection)
-        .where('isActive', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.productsCollection)
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => Product.fromFirestore(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => Product.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi chưa tạo composite index cho query orderBy + where.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.productsCollection)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      final products = snapshot.docs
+          .map((doc) => Product.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      products.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return products;
+    }
   }
 
   /// Lấy sản phẩm theo danh mục
   Future<List<Product>> getProductsByCategory(String category) async {
-    final snapshot = await _db
-        .collection(AppConstants.productsCollection)
-        .where('isActive', isEqualTo: true)
-        .where('category', isEqualTo: category)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.productsCollection)
+          .where('isActive', isEqualTo: true)
+          .where('category', isEqualTo: category)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => Product.fromFirestore(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => Product.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi thiếu index cho category + isActive + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.productsCollection)
+          .where('isActive', isEqualTo: true)
+          .where('category', isEqualTo: category)
+          .get();
+
+      final products = snapshot.docs
+          .map((doc) => Product.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      products.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return products;
+    }
   }
 
   /// Lấy 1 sản phẩm theo ID
@@ -63,9 +98,11 @@ class FirebaseService {
 
     return snapshot.docs
         .map((doc) => Product.fromFirestore(doc.data(), doc.id))
-        .where((product) =>
-            product.name.toLowerCase().contains(queryLower) ||
-            product.tags.any((tag) => tag.toLowerCase().contains(queryLower)))
+        .where(
+          (product) =>
+              product.name.toLowerCase().contains(queryLower) ||
+              product.tags.any((tag) => tag.toLowerCase().contains(queryLower)),
+        )
         .toList();
   }
 
@@ -248,10 +285,8 @@ class FirebaseService {
     await _db.runTransaction((transaction) async {
       final productDoc = await transaction.get(productRef);
       if (productDoc.exists) {
-        final currentRating =
-            (productDoc.data()?['rating'] ?? 0).toDouble();
-        final currentCount =
-            (productDoc.data()?['reviewCount'] ?? 0).toInt();
+        final currentRating = (productDoc.data()?['rating'] ?? 0).toDouble();
+        final currentCount = (productDoc.data()?['reviewCount'] ?? 0).toInt();
 
         final newCount = currentCount + 1;
         final newRating =

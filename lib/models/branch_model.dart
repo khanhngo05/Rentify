@@ -79,17 +79,12 @@ class BranchModel {
   }
 }
 
-/// Giờ mở cửa trong 1 ngày
 class DayHours {
   final String open;
   final String close;
   final bool isOpen;
 
-  DayHours({
-    required this.open,
-    required this.close,
-    this.isOpen = true,
-  });
+  DayHours({required this.open, required this.close, this.isOpen = true});
 
   factory DayHours.fromMap(Map<String, dynamic> data) {
     return DayHours(
@@ -100,11 +95,7 @@ class DayHours {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'open': open,
-      'close': close,
-      'isOpen': isOpen,
-    };
+    return {'open': open, 'close': close, 'isOpen': isOpen};
   }
 }
 

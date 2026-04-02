@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'constants/app_constants.dart';
 import 'constants/app_theme.dart';
 import 'firebase_options.dart';
+import 'screens/home_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'services/auth_service.dart';
 
@@ -67,7 +68,7 @@ class _AuthGateState extends State<AuthGate> {
           return _SignedOutView(authService: _authService);
         }
 
-        return _SignedInView(authService: _authService, user: user);
+        return const HomeScreen();
       },
     );
   }
