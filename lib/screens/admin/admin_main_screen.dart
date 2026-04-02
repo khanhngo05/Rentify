@@ -111,20 +111,19 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Đăng xuất'),
         content: const Text('Bạn có chắc muốn đăng xuất?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
             onPressed: () async {
+              // Đóng dialog trước khi đăng xuất
+              Navigator.pop(dialogContext);
               await _authService.signOut();
-              if (mounted) {
-                Navigator.pop(context);
-              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
