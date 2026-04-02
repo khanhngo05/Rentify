@@ -156,6 +156,25 @@ class AuthService {
     await _auth.sendPasswordResetEmail(email: email);
   }
 
+  /// Cap nhat thong tin profile cua user.
+  Future<void> updateUserProfile({
+    String? phoneNumber,
+    String? avatarUrl,
+    String? address,
+  }) async {
+    final user = currentUser;
+    if (user == null) return;
+
+    final userRef = _db.collection(AppConstants.usersCollection).doc(user.uid);
+
+    final updates = <String, dynamic>{};
+    if (phoneNumber != null) updates['phoneNumber'] = phoneNumber;
+    if (avatarUrl != null) updates['avatarUrl'] = avatarUrl;
+    if (address != null) updates['address'] = address;
+
+    await userRef.update(updates);
+  }
+
   /// Lay UserModel tu Firestore.
   Future<UserModel?> _getUserFromFirestore(String uid) async {
     final doc = await _db

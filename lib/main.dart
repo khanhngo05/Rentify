@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'constants/app_constants.dart';
 import 'constants/app_theme.dart';
 import 'firebase_options.dart';
+import 'screens/profile_setup_screen.dart';
 import 'services/auth_service.dart';
 
 void main() async {
@@ -265,6 +266,13 @@ class _AuthOptionsSheetState extends State<_AuthOptionsSheet> {
           password: password,
           displayName: displayName,
         );
+
+        if (mounted) {
+          Navigator.of(context).pop(); // close modal
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+          );
+        }
       } else {
         final user = await widget.authService.signIn(
           email: email,
@@ -274,9 +282,9 @@ class _AuthOptionsSheetState extends State<_AuthOptionsSheet> {
           _showError('Đăng nhập thất bại. Kiểm tra lại tài khoản.');
           return;
         }
-      }
 
-      if (mounted) Navigator.of(context).pop();
+        if (mounted) Navigator.of(context).pop();
+      }
     } on FirebaseAuthException catch (e) {
       final message = _messageFromAuthCode(e.code);
       final details = (e.message ?? '').trim();
