@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/app_constants.dart';
@@ -47,6 +48,20 @@ class SupabaseService {
     return await _uploadFile(path, imageFile);
   }
 
+  /// Upload ảnh đại diện bằng bytes (hỗ trợ web)
+  Future<String?> uploadAvatarBytes({
+    required String userId,
+    required Uint8List imageBytes,
+    String fileExtension = 'jpg',
+  }) async {
+    final ext = fileExtension.replaceAll('.', '').toLowerCase();
+    final safeExt = ext.isEmpty ? 'jpg' : ext;
+    final name = '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+    final path = '${AppConstants.supabaseAvatarsFolder}/$userId/$name';
+    final contentType = _contentTypeFromExtension(safeExt);
+    return await _uploadBinary(path, imageBytes, contentType: contentType);
+  }
+
   /// Upload ảnh chi nhánh
   Future<String?> uploadBranchImage({
     required String branchId,
@@ -65,9 +80,7 @@ class SupabaseService {
   /// Xóa 1 ảnh theo đường dẫn
   Future<bool> deleteImage(String path) async {
     try {
-      await _storage
-          .from(AppConstants.supabaseBucket)
-          .remove([path]);
+      await _storage.from(AppConstants.supabaseBucket).remove([path]);
       return true;
     } catch (e) {
       debugPrint('Lỗi xóa ảnh: $e');
@@ -84,9 +97,7 @@ class SupabaseService {
 
       if (files.isNotEmpty) {
         final paths = files.map((f) => '$folderPath/${f.name}').toList();
-        await _storage
-            .from(AppConstants.supabaseBucket)
-            .remove(paths);
+        await _storage.from(AppConstants.supabaseBucket).remove(paths);
       }
       return true;
     } catch (e) {
@@ -101,9 +112,7 @@ class SupabaseService {
 
   /// Lấy URL công khai của 1 ảnh
   String getPublicUrl(String path) {
-    return _storage
-        .from(AppConstants.supabaseBucket)
-        .getPublicUrl(path);
+    return _storage.from(AppConstants.supabaseBucket).getPublicUrl(path);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -113,19 +122,61 @@ class SupabaseService {
   /// Upload file và trả về URL công khai
   Future<String?> _uploadFile(String path, File file) async {
     try {
-      await _storage.from(AppConstants.supabaseBucket).upload(
+      await _storage
+          .from(AppConstants.supabaseBucket)
+          .upload(
             path,
             file,
-            fileOptions: const FileOptions(
-              cacheControl: '3600',
-              upsert: true,
-            ),
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
           );
 
       return getPublicUrl(path);
     } catch (e) {
       debugPrint('Lỗi upload ảnh: $e');
       return null;
+    }
+  }
+
+  /// Upload bytes và trả về URL công khai
+  Future<String?> _uploadBinary(
+    String path,
+    Uint8List bytes, {
+    String? contentType,
+  }) async {
+    try {
+      await _storage
+          .from(AppConstants.supabaseBucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              upsert: true,
+              contentType: contentType,
+            ),
+          );
+
+      return getPublicUrl(path);
+    } catch (e) {
+      debugPrint('Lỗi upload bytes: $e');
+      return null;
+    }
+  }
+
+  String _contentTypeFromExtension(String extension) {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'heic':
+        return 'image/heic';
+      case 'jpeg':
+      case 'jpg':
+      default:
+        return 'image/jpeg';
     }
   }
 }

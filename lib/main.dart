@@ -6,9 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'constants/app_constants.dart';
 import 'constants/app_theme.dart';
 import 'firebase_options.dart';
+import 'models/user_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/admin/admin_main_screen.dart';
 import 'services/auth_service.dart';
+import 'services/firebase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +54,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final AuthService _authService = AuthService();
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +72,27 @@ class _AuthGateState extends State<AuthGate> {
           return const LoginScreen();
         }
 
-        return const HomeScreen();
+        // Kiểm tra role của user để phân luồng
+        return FutureBuilder<UserModel?>(
+          future: _firebaseService.getUserById(user.uid),
+          builder: (context, userSnapshot) {
+            if (userSnapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final userModel = userSnapshot.data;
+            
+            // Nếu là admin thì vào AdminMainScreen
+            if (userModel != null && userModel.isAdmin) {
+              return const AdminMainScreen();
+            }
+
+            // User thường vào HomeScreen
+            return const HomeScreen();
+          },
+        );
       },
     );
   }

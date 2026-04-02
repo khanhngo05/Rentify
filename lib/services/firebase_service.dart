@@ -146,6 +146,22 @@ class FirebaseService {
         .toList();
   }
 
+  /// Lấy tồn kho của 1 sản phẩm tại 1 chi nhánh
+  Future<BranchInventory?> getProductInventory(
+    String branchId,
+    String productId,
+  ) async {
+    final doc = await _db
+        .collection(AppConstants.branchesCollection)
+        .doc(branchId)
+        .collection(AppConstants.inventorySubcollection)
+        .doc(productId)
+        .get();
+
+    if (!doc.exists) return null;
+    return BranchInventory.fromFirestore(doc.data()!, doc.id);
+  }
+
   /// Kiểm tra sản phẩm còn hàng ở chi nhánh X không
   Future<bool> checkAvailability(String branchId, String productId) async {
     final doc = await _db
