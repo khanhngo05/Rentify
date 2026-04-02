@@ -8,6 +8,8 @@ import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'rental_booking_screen.dart';
+// Phần cấy thêm: Import Dialog giỏ hàng của Dũng (Nhớ báo Giang check lại đường dẫn nếu file để ở thư mục khác)
+import '../widgets/common/add_to_cart_dialog.dart'; 
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.product});
@@ -483,22 +485,69 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: canRent
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RentalBookingScreen(
-                          product: product,
-                          selectedSize: _selectedSize,
-                          selectedColor: _selectedColor,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            child: const Text('Thuê ngay'),
+          // Phần cấy thêm: Sửa nút Thuê ngay độc lập thành 1 Row chứa cả 2 nút
+          child: Row(
+            children: [
+              // Nút Thêm vào giỏ (Gọi AddToCartDialog của Dũng)
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: AppColors.primary),
+                  ),
+                  onPressed: canRent
+                      ? () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AddToCartDialog(
+                              productId: product.id,
+                              productName: product.name,
+                              imageUrl: product.thumbnailUrl,
+                              rentalPrice: product.rentalPricePerDay.toDouble(),
+                              depositPrice: product.depositAmount.toDouble(),
+                              selectedSize: _selectedSize,
+                              selectedColor: _selectedColor,
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text(
+                    'Thêm vào giỏ',
+                    style: TextStyle(
+                      color: AppColors.primary, 
+                      fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Nút Thuê ngay (Giữ nguyên logic gốc của Giang)
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: canRent
+                      ? () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RentalBookingScreen(
+                                product: product,
+                                selectedSize: _selectedSize,
+                                selectedColor: _selectedColor,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text(
+                    'Thuê ngay',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
