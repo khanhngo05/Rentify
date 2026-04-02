@@ -7,6 +7,7 @@ import '../services/firebase_service.dart';
 import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
 import 'branch_screen.dart';
+import 'cart_screen.dart';
 import 'history_screen.dart';
 import 'product_detail_screen.dart';
 import 'home/widgets/category_chips.dart';
@@ -72,8 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: IndexedStack(index: _viewModel.selectedTabIndex, children: pages),
       bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(10, 0, 10, 4),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: BottomNavigationBar(
@@ -112,16 +111,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return SafeArea(
       child: Column(
         children: [
-          HomeAppBar(
-            onCartTap: () => ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Giỏ hàng'))),
-            onMessageTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),
-            onNotifyTap: () => ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Thông báo'))),
+ HomeAppBar(
+            // FIX: Điều hướng sang màn hình giỏ hàng của bạn
+            onCartTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            ),
+            onMessageTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MessagesScreen())
+            ),
+            onNotifyTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Thông báo'))
+            ),
           ),
           Expanded(
             child: CustomScrollView(
