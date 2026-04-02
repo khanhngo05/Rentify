@@ -23,6 +23,15 @@ class RentalBookingScreen extends StatefulWidget {
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
   late DateTimeRange _rentalRange;
+  String? _receiverName;
+  String? _receiverPhone;
+  String? _receiverAddress;
+
+  bool get _hasReceiverInfo {
+    return (_receiverName?.trim().isNotEmpty ?? false) &&
+        (_receiverPhone?.trim().isNotEmpty ?? false) &&
+        (_receiverAddress?.trim().isNotEmpty ?? false);
+  }
 
   int get _rentalDays =>
       _rentalRange.end.difference(_rentalRange.start).inDays + 1;
@@ -37,6 +46,25 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
 
   String _formatDate(DateTime date) {
     return DateFormat(AppConstants.dateFormat).format(date);
+  }
+
+  Future<void> _showAddressDialog() async {
+    final receiverInfo = await showDialog<_ReceiverInfo>(
+      context: context,
+      builder: (_) => _AddressInputDialog(
+        initialName: _receiverName,
+        initialPhone: _receiverPhone,
+        initialAddress: _receiverAddress,
+      ),
+    );
+
+    if (!mounted || receiverInfo == null) return;
+
+    setState(() {
+      _receiverName = receiverInfo.name;
+      _receiverPhone = receiverInfo.phone;
+      _receiverAddress = receiverInfo.address;
+    });
   }
 
   Future<void> _pickRentalRange() async {
@@ -84,43 +112,60 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
-          _SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.location_on_rounded, color: AppColors.error),
-                        SizedBox(width: 8),
-                        Text(
-                          'Địa chỉ nhận hàng',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+          GestureDetector(
+            onTap: _showAddressDialog,
+            child: _SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_rounded,
+                            color: AppColors.primary,
                           ),
-                        ),
-                      ],
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.textHint,
-                      size: 22,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Chọn địa chỉ',
-                  style: TextStyle(
-                    color: AppColors.error,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                          SizedBox(width: 8),
+                          Text(
+                            'Địa chỉ nhận đồ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textHint,
+                        size: 22,
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  if (_hasReceiverInfo) ...[
+                    Text(
+                      '${_receiverName!}  •  ${_receiverPhone!}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _receiverAddress!,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ] else
+                    const Text(
+                      'Chọn địa chỉ',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -318,6 +363,136 @@ class _SectionCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: child,
+    );
+  }
+}
+
+class _ReceiverInfo {
+  const _ReceiverInfo({
+    required this.name,
+    required this.phone,
+    required this.address,
+  });
+
+  final String name;
+  final String phone;
+  final String address;
+}
+
+class _AddressInputDialog extends StatefulWidget {
+  const _AddressInputDialog({
+    this.initialName,
+    this.initialPhone,
+    this.initialAddress,
+  });
+
+  final String? initialName;
+  final String? initialPhone;
+  final String? initialAddress;
+
+  @override
+  State<_AddressInputDialog> createState() => _AddressInputDialogState();
+}
+
+class _AddressInputDialogState extends State<_AddressInputDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _addressController;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName ?? '');
+    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialAddress ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    Navigator.of(context).pop(
+      _ReceiverInfo(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Thông tin nhận hàng'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Họ và tên'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập họ và tên';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập số điện thoại';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _addressController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Địa chỉ nhận hàng',
+                  alignLabelWithHint: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Vui lòng nhập địa chỉ nhận hàng';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _save,
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 }
