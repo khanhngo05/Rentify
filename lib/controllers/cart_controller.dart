@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class CartItem {
   final String productId;
   final String productName;
-  final String imageUrl;
+  final String thumbnailUrl; // Dùng thống nhất tên này
   final String size;
   final String color;
   final DateTime startDate;
@@ -19,7 +19,7 @@ class CartItem {
   CartItem({
     required this.productId,
     required this.productName,
-    required this.imageUrl,
+    required this.thumbnailUrl,
     required this.size,
     required this.color,
     required this.startDate,
@@ -39,18 +39,10 @@ class CartItem {
 
 class CartController extends ChangeNotifier {
   final List<CartItem> _items = [];
-
   List<CartItem> get items => List.unmodifiable(_items);
 
   void addToCart(CartItem item) {
-    // Kiểm tra nếu trùng sản phẩm, size, màu và ngày thì tăng số lượng
-    int index = _items.indexWhere((i) => 
-      i.productId == item.productId && 
-      i.size == item.size && 
-      i.color == item.color &&
-      i.startDate == item.startDate
-    );
-
+    int index = _items.indexWhere((i) => i.productId == item.productId && i.size == item.size && i.color == item.color);
     if (index >= 0) {
       _items[index].quantity += item.quantity;
     } else {
@@ -64,9 +56,8 @@ class CartController extends ChangeNotifier {
     notifyListeners();
   }
 
-  double get totalRentalPrice => _items.fold(0, (sum, item) => sum + item.totalItemPrice);
-  double get totalDeposit => _items.fold(0, (sum, item) => sum + item.totalItemDeposit);
+  double get totalRentalPrice => _items.fold(0, (sum, i) => sum + i.totalItemPrice);
+  double get totalDeposit => _items.fold(0, (sum, i) => sum + i.totalItemDeposit);
 }
 
-// Khai báo global để các file khác gọi được luôn (theo style cũ của bạn)
 final cartController = CartController();
