@@ -7,6 +7,7 @@ import '../services/firebase_service.dart';
 import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
 import 'branch_screen.dart';
+import 'cart_screen.dart'; // THÊM MỚI: Import màn hình Giỏ hàng của P4
 import 'history_screen.dart';
 import 'product_detail_screen.dart';
 import 'home/widgets/category_chips.dart';
@@ -113,9 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           HomeAppBar(
-            onCartTap: () => ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Giỏ hàng'))),
+            // CẬP NHẬT: Điều hướng sang CartScreen thay vì hiện SnackBar
+            onCartTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            ),
             onMessageTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),
