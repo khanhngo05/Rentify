@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../constants/app_colors.dart';
@@ -10,6 +12,7 @@ import '../models/order_model.dart';
 import '../models/review_model.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../services/image_picker_service.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({
@@ -229,7 +232,7 @@ class _OrderScreenState extends State<OrderScreen>
         createdAt: DateTime.now(),
       );
 
-      await _firebaseService.createReview(review);
+      await _firebaseService.createReview(review, images: draft.images);
       if (!mounted) return;
       setState(() {
         _reviewedByOrderItem[key] = true;
@@ -826,10 +829,15 @@ class _StatusTab {
 }
 
 class _ReviewDraft {
-  const _ReviewDraft({required this.rating, this.comment});
+  const _ReviewDraft({
+    required this.rating,
+    this.comment,
+    this.images,
+  });
 
   final int rating;
   final String? comment;
+  final List<XFile>? images;
 }
 
 class _ReviewInputDialog extends StatefulWidget {
@@ -844,6 +852,8 @@ class _ReviewInputDialog extends StatefulWidget {
 class _ReviewInputDialogState extends State<_ReviewInputDialog> {
   int _rating = 5;
   final TextEditingController _commentController = TextEditingController();
+  final ImagePickerService _imagePickerService = ImagePickerService();
+  final List<XFile> _selectedImages = [];
 
   @override
   void dispose() {
@@ -851,9 +861,66 @@ class _ReviewInputDialogState extends State<_ReviewInputDialog> {
     super.dispose();
   }
 
+  Future<void> _pickImages() async {
+    final remainingSlots = AppConstants.maxReviewPhotos - _selectedImages.length;
+    if (remainingSlots <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tối đa ${AppConstants.maxReviewPhotos} ảnh'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    final images = await _imagePickerService.showImageSourceDialog(
+      context: context,
+      allowMultiple: true,
+      maxImages: remainingSlots,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      imageQuality: 85,
+    );
+
+    if (images != null && images.isNotEmpty) {
+      // Validate image sizes
+      final validation = await _imagePickerService.validateImages(
+        images,
+        maxSizeInMB: 5.0,
+      );
+
+      setState(() {
+        _selectedImages.addAll(validation['valid']!);
+      });
+
+      if (validation['invalid']!.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${validation['invalid']!.length} ảnh bị bỏ qua vì quá lớn (>5MB)',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
   void _submit() {
     Navigator.of(context).pop(
-      _ReviewDraft(rating: _rating, comment: _commentController.text),
+      _ReviewDraft(
+        rating: _rating,
+        comment: _commentController.text,
+        images: _selectedImages.isEmpty ? null : _selectedImages,
+      ),
     );
   }
 
@@ -902,6 +969,74 @@ class _ReviewInputDialogState extends State<_ReviewInputDialog> {
                 alignLabelWithHint: true,
               ),
             ),
+            const SizedBox(height: 16),
+            // Image picker section
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickImages,
+                  icon: const Icon(Icons.add_photo_alternate),
+                  label: Text(
+                    'Thêm ảnh (${_selectedImages.length}/${AppConstants.maxReviewPhotos})',
+                  ),
+                ),
+              ],
+            ),
+            // Image preview grid
+            if (_selectedImages.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _selectedImages.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final imageFile = entry.value;
+                  
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(imageFile.path),
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          cacheWidth: 200,
+                          cacheHeight: 200,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 100,
+                              height: 100,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.error),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: InkWell(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),

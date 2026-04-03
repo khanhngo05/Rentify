@@ -5,10 +5,12 @@ import '../models/branch_model.dart';
 import '../models/order_model.dart';
 import '../models/review_model.dart';
 import '../models/user_model.dart';
+import 'supabase_service.dart';
 
 /// Service quản trị viên - mở rộng các chức năng CRUD cho admin
 class AdminService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final SupabaseService _supabaseService = SupabaseService();
 
   // ═══════════════════════════════════════════════════════════════
   //  DASHBOARD & THỐNG KÊ
@@ -446,6 +448,16 @@ class AdminService {
     if (!reviewDoc.exists) return;
 
     final review = ReviewModel.fromFirestore(reviewDoc.data()!, reviewId);
+
+    // Xóa ảnh trên Supabase nếu có
+    if (review.photoUrls.isNotEmpty) {
+      try {
+        await _supabaseService.deleteFolder('reviews/$reviewId');
+      } catch (e) {
+        // Log error nhưng vẫn tiếp tục xóa review
+        print('Error deleting review photos: $e');
+      }
+    }
 
     // Xóa review
     await _db

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../models/branch_model.dart';
@@ -6,10 +9,12 @@ import '../models/order_model.dart';
 import '../models/review_model.dart';
 import '../models/favorite_model.dart';
 import '../models/user_model.dart';
+import 'supabase_service.dart';
 
 /// Service chính giao tiếp với Firebase Firestore
 class FirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final SupabaseService _supabaseService = SupabaseService();
 
   // ═══════════════════════════════════════════════════════════════
   //  PRODUCTS
@@ -405,7 +410,10 @@ class FirebaseService {
   }
 
   /// Tạo đánh giá mới + cập nhật rating trung bình của sản phẩm
-  Future<String> createReview(ReviewModel review) async {
+  Future<String> createReview(
+    ReviewModel review, {
+    List<XFile>? images,
+  }) async {
     if (review.orderId.trim().isEmpty) {
       throw FirebaseException(
         plugin: 'cloud_firestore',
@@ -457,9 +465,39 @@ class FirebaseService {
       );
     }
 
+    // Tạo review document trước để có reviewId
     final docRef = await _db
         .collection(AppConstants.reviewsCollection)
         .add(review.toMap());
+
+    // Upload ảnh lên Supabase nếu có
+    final List<String> photoUrls = [];
+    if (images != null && images.isNotEmpty) {
+      for (var i = 0; i < images.length; i++) {
+        try {
+          final imageFile = File(images[i].path);
+          final fileName = '${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          
+          final url = await _supabaseService.uploadReviewPhoto(
+            reviewId: docRef.id,
+            imageFile: imageFile,
+            fileName: fileName,
+          );
+          
+          if (url != null) {
+            photoUrls.add(url);
+          }
+        } catch (e) {
+          // Log error nhưng không fail toàn bộ review
+          print('Error uploading image $i: $e');
+        }
+      }
+
+      // Update review document với photoUrls
+      if (photoUrls.isNotEmpty) {
+        await docRef.update({'photoUrls': photoUrls});
+      }
+    }
 
     // Cập nhật rating trung bình và reviewCount của sản phẩm
     final productRef = _db

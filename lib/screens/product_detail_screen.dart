@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -13,7 +14,7 @@ import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'cart_booking_screen.dart';
 // Phần cấy thêm: Import Dialog giỏ hàng của Dũng (Nhớ báo Giang check lại đường dẫn nếu file để ở thư mục khác)
-import '../widgets/common/add_to_cart_dialog.dart'; 
+import '../widgets/common/add_to_cart_dialog.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.product});
@@ -205,6 +206,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  void _showPhotoDialog(String photoUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(
+                    Icons.broken_image_rounded,
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 30,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black54,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _rentNowDirectly() {
@@ -818,6 +863,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             if ((review.comment ?? '').trim().isNotEmpty) ...[
                               const SizedBox(height: 6),
                               Text(review.comment!.trim()),
+                            ],
+                            // Review photos
+                            if (review.photoUrls.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 80,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: review.photoUrls.length,
+                                  itemBuilder: (context, photoIndex) {
+                                    final photoUrl = review.photoUrls[photoIndex];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: GestureDetector(
+                                        onTap: () => _showPhotoDialog(photoUrl),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: CachedNetworkImage(
+                                            imageUrl: photoUrl,
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => Container(
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              ),
+                                            ),
+                                            errorWidget: (context, url, error) => Container(
+                                              color: Colors.grey[200],
+                                              child: const Icon(
+                                                Icons.broken_image_rounded,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
                           ],
                         ),
