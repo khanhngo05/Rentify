@@ -79,6 +79,8 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
     final displayName = widget.displayName.trim().isNotEmpty
         ? widget.displayName.trim()
         : (widget.email ?? 'Rentify User');
+    final avatarUrl = widget.avatarUrl?.trim();
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
     final avatarText = displayName.characters.first.toUpperCase();
 
     return Scaffold(
@@ -107,19 +109,19 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                     CircleAvatar(
                       radius: 44,
                       backgroundColor: AppColors.surfaceVariant,
-                      backgroundImage: widget.avatarUrl != null
-                          ? NetworkImage(widget.avatarUrl!)
+                      backgroundImage: hasAvatar
+                          ? NetworkImage(avatarUrl)
                           : null,
-                      child: widget.avatarUrl == null
-                          ? Text(
+                      child: hasAvatar
+                          ? null
+                          : Text(
                               avatarText,
                               style: const TextStyle(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 30,
                               ),
-                            )
-                          : null,
+                            ),
                     ),
                     const SizedBox(height: 16),
                     Text(

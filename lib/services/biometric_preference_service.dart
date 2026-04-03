@@ -41,10 +41,19 @@ class BiometricPreferenceService {
     await prefs.setBool(_globalEnabledKey, enabled);
   }
 
-  Future<void> saveRememberedUserProfile(User user) async {
+  Future<void> saveRememberedUserProfile(
+    User user, {
+    String? displayNameOverride,
+    String? avatarUrlOverride,
+    String? emailOverride,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    final displayName = user.displayName?.trim();
-    final fallbackName = user.email?.trim();
+    final displayName = displayNameOverride?.trim().isNotEmpty == true
+        ? displayNameOverride!.trim()
+        : user.displayName?.trim();
+    final fallbackName = emailOverride?.trim().isNotEmpty == true
+        ? emailOverride!.trim()
+        : user.email?.trim();
 
     await prefs.setString(_lastUidKey, user.uid);
     await prefs.setString(
@@ -54,14 +63,20 @@ class BiometricPreferenceService {
           : (fallbackName ?? 'Rentify User')),
     );
 
-    if (user.photoURL != null && user.photoURL!.trim().isNotEmpty) {
-      await prefs.setString(_lastAvatarUrlKey, user.photoURL!.trim());
+    final avatar = avatarUrlOverride?.trim().isNotEmpty == true
+        ? avatarUrlOverride!.trim()
+        : user.photoURL?.trim();
+    if (avatar != null && avatar.isNotEmpty) {
+      await prefs.setString(_lastAvatarUrlKey, avatar);
     } else {
       await prefs.remove(_lastAvatarUrlKey);
     }
 
-    if (user.email != null && user.email!.trim().isNotEmpty) {
-      await prefs.setString(_lastEmailKey, user.email!.trim());
+    final email = emailOverride?.trim().isNotEmpty == true
+        ? emailOverride!.trim()
+        : user.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      await prefs.setString(_lastEmailKey, email);
     } else {
       await prefs.remove(_lastEmailKey);
     }
@@ -87,6 +102,14 @@ class BiometricPreferenceService {
       avatarUrl: avatar,
       email: email,
     );
+  }
+
+  Future<void> clearRememberedUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_lastUidKey);
+    await prefs.remove(_lastDisplayNameKey);
+    await prefs.remove(_lastAvatarUrlKey);
+    await prefs.remove(_lastEmailKey);
   }
 
   Future<void> clearForUser(String uid) async {

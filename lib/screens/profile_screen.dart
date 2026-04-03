@@ -88,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       if (!value) {
         await _biometricPreferenceService.setEnabledForUser(current.uid, false);
+        await _biometricPreferenceService.clearRememberedUserProfile();
         if (!mounted) return;
         setState(() {
           _biometricLoginEnabled = false;
@@ -155,17 +156,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final user = await _firebaseService.getUserById(current.uid);
       if (!mounted) return;
+      final effectiveUser =
+          user ??
+          UserModel(
+            uid: current.uid,
+            email: current.email ?? '',
+            displayName: current.displayName ?? 'Người dùng Rentify',
+            phoneNumber: current.phoneNumber,
+            avatarUrl: current.photoURL,
+            createdAt: DateTime.now(),
+          );
+
+      await _biometricPreferenceService.saveRememberedUserProfile(
+        current,
+        displayNameOverride: effectiveUser.displayName,
+        avatarUrlOverride: effectiveUser.avatarUrl,
+        emailOverride: effectiveUser.email,
+      );
+
+      if (!mounted) return;
       setState(() {
-        _user =
-            user ??
-            UserModel(
-              uid: current.uid,
-              email: current.email ?? '',
-              displayName: current.displayName ?? 'Người dùng Rentify',
-              phoneNumber: current.phoneNumber,
-              avatarUrl: current.photoURL,
-              createdAt: DateTime.now(),
-            );
+        _user = effectiveUser;
       });
     } finally {
       if (!mounted) return;
