@@ -510,6 +510,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               branchId: _selectedBranch!.id,
                               branchName: _selectedBranch!.name,
                               branchAddress: _selectedBranch!.address,
+                              availableStock: _availableStockForBranch(_selectedBranch!.id),
                             ),
                           );
                         }

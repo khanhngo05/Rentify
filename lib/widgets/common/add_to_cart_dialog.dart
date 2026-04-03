@@ -14,6 +14,7 @@ class AddToCartDialog extends StatelessWidget {
   final String branchId;
   final String branchName;
   final String branchAddress;
+  final int availableStock; // Thêm tồn kho
 
   const AddToCartDialog({
     Key? key,
@@ -27,6 +28,7 @@ class AddToCartDialog extends StatelessWidget {
     required this.branchId,
     required this.branchName,
     required this.branchAddress,
+    required this.availableStock,
   }) : super(key: key);
 
   @override
@@ -77,17 +79,27 @@ class AddToCartDialog extends StatelessWidget {
                 branchId: branchId,
                 branchName: branchName,
                 branchAddress: branchAddress,
+                availableStock: availableStock,
               );
 
               // 2. Gọi hàm lưu vào giỏ
-              await context.read<CartProvider>().addToCart(newItem);
+              final added = await context.read<CartProvider>().addToCart(newItem);
 
               // 3. Đóng dialog và báo thành công
               if (!context.mounted) return;
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
-              );
+              if (added) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã đạt số lượng tồn kho tối đa!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             } catch (e) {
               if (!context.mounted) return;
               Navigator.pop(context);

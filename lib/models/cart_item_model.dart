@@ -9,6 +9,7 @@ class CartItemModel {
   final String branchId;
   final String branchName;
   final String branchAddress;
+  final int availableStock; // Số lượng tồn kho tại chi nhánh
   int quantity;
   int rentalDays; // Số ngày thuê mặc định
 
@@ -23,6 +24,7 @@ class CartItemModel {
     required this.branchId,
     required this.branchName,
     required this.branchAddress,
+    this.availableStock = 999, // Mặc định nếu không có
     this.quantity = 1,
     this.rentalDays = 1,
   });
@@ -46,6 +48,7 @@ class CartItemModel {
       'branchId': branchId,
       'branchName': branchName,
       'branchAddress': branchAddress,
+      'availableStock': availableStock,
       'quantity': quantity,
       'rentalDays': rentalDays,
     };
@@ -64,6 +67,7 @@ class CartItemModel {
       branchId: map['branchId'] ?? '',
       branchName: map['branchName'] ?? '',
       branchAddress: map['branchAddress'] ?? '',
+      availableStock: (map['availableStock'] ?? 999).toInt(),
       quantity: (map['quantity'] ?? 1).toInt(),
       rentalDays: (map['rentalDays'] ?? 1).toInt(),
     );
