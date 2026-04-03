@@ -17,7 +17,9 @@ import 'messages_screen.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -40,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _viewModel = HomeViewModel(firebaseService: FirebaseService());
+    _viewModel.selectedTabIndex = widget.initialTabIndex.clamp(0, 3);
+    _lastTabIndex = _viewModel.selectedTabIndex;
     _viewModel.addListener(_onModelChanged);
     _searchController.addListener(_onSearchChanged);
     _viewModel.loadProducts();
@@ -122,9 +126,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           HomeAppBar(
             // Giỏ hàng vẫn nằm ở đây (top right)
-            onCartTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const CartScreen()),
-            ),
+            onCartTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const CartScreen())),
             onMessageTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const MessagesScreen())),

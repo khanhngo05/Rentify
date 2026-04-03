@@ -67,22 +67,42 @@ class AuthService {
   }
 
   /// Dang nhap bang Google.
-  Future<UserModel> signInWithGoogle() async {
+  Future<UserModel> signInWithGoogle({
+    bool forceAccountSelection = true,
+    bool silentOnly = false,
+  }) async {
     UserCredential credential;
     try {
       if (kIsWeb) {
         final provider = GoogleAuthProvider();
-        provider.setCustomParameters(<String, String>{'prompt': 'select_account'});
+        if (forceAccountSelection) {
+          provider.setCustomParameters(<String, String>{
+            'prompt': 'select_account',
+          });
+        }
         credential = await _auth.signInWithPopup(provider);
       } else {
         final googleSignIn = GoogleSignIn(scopes: <String>['email', 'profile']);
-        await googleSignIn.signOut();
-        final googleUser = await googleSignIn.signIn();
+        GoogleSignInAccount? googleUser;
+
+        if (forceAccountSelection) {
+          await googleSignIn.signOut();
+          googleUser = await googleSignIn.signIn();
+        } else {
+          googleUser = await googleSignIn.signInSilently();
+          if (googleUser == null && !silentOnly) {
+            googleUser = await googleSignIn.signIn();
+          }
+        }
 
         if (googleUser == null) {
           throw FirebaseAuthException(
-            code: 'sign_in_canceled',
-            message: 'Nguoi dung da huy dang nhap Google.',
+            code: silentOnly
+                ? 'silent_sign_in_unavailable'
+                : 'sign_in_canceled',
+            message: silentOnly
+                ? 'Chua co tai khoan Google da dang nhap tren thiet bi.'
+                : 'Nguoi dung da huy dang nhap Google.',
           );
         }
 

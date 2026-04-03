@@ -104,7 +104,7 @@ class _AuthGateState extends State<AuthGate> {
             }
 
             // User thường vào HomeScreen
-            return const HomeScreen();
+            return const HomeScreen(initialTabIndex: 0);
           },
         );
       },

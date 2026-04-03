@@ -7,6 +7,8 @@ import '../models/favorite_model.dart';
 import '../models/product_model.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/biometric_preference_service.dart';
+import '../services/biometric_service.dart';
 import '../services/firebase_service.dart';
 import '../services/supabase_service.dart';
 import 'history_screen.dart';
@@ -21,6 +23,9 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
+  final BiometricPreferenceService _biometricPreferenceService =
+      BiometricPreferenceService();
+  final BiometricService _biometricService = BiometricService();
   final FirebaseService _firebaseService = FirebaseService();
   final SupabaseService _supabaseService = SupabaseService();
   final ImagePicker _imagePicker = ImagePicker();
@@ -30,6 +35,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSavingProfile = false;
   bool _isUploadingAvatar = false;
   bool _isSigningOut = false;
+  bool _biometricLoginEnabled = false;
+  bool _isUpdatingBiometricSetting = false;
 
   List<FavoriteModel> _favorites = <FavoriteModel>[];
   bool _isLoadingFavorites = true;
@@ -41,7 +48,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    await Future.wait(<Future<void>>[_loadProfile(), _loadFavorites()]);
+    await Future.wait(<Future<void>>[
+      _loadProfile(),
+      _loadFavorites(),
+      _loadBiometricPreference(),
+    ]);
+  }
+
+  Future<void> _loadBiometricPreference() async {
+    final current = _authService.currentUser;
+    if (current == null) {
+      if (!mounted) return;
+      setState(() {
+        _biometricLoginEnabled = false;
+      });
+      return;
+    }
+
+    final isEnabled = await _biometricPreferenceService.isEnabledForUser(
+      current.uid,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _biometricLoginEnabled = isEnabled;
+    });
+  }
+
+  Future<void> _onBiometricSwitchChanged(bool value) async {
+    final current = _authService.currentUser;
+    if (current == null || _isUpdatingBiometricSetting) {
+      return;
+    }
+
+    setState(() {
+      _isUpdatingBiometricSetting = true;
+    });
+
+    try {
+      if (!value) {
+        await _biometricPreferenceService.setEnabledForUser(current.uid, false);
+        if (!mounted) return;
+        setState(() {
+          _biometricLoginEnabled = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã tắt đăng nhập Face ID')),
+        );
+        return;
+      }
+
+      final result = await _biometricService.authenticateForLogin();
+      if (result == BiometricAuthResult.verified) {
+        await _biometricPreferenceService.setEnabledForUser(current.uid, true);
+        if (!mounted) return;
+        setState(() {
+          _biometricLoginEnabled = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã bật đăng nhập Face ID')),
+        );
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _biometricLoginEnabled = false;
+      });
+
+      if (result == BiometricAuthResult.unavailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thiết bị chưa bật Face ID để sử dụng tính năng này'),
+          ),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể xác thực sinh trắc học')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingBiometricSetting = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -455,6 +548,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   MaterialPageRoute(builder: (_) => const FavoriteListScreen()),
                 );
               },
+            ),
+            const SizedBox(height: 14),
+            _SectionCard(
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.fingerprint_rounded,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đăng nhập Face ID',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Sau khi bật, lần đăng nhập sau chỉ cần quét sinh trắc học',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _biometricLoginEnabled,
+                    onChanged: _isUpdatingBiometricSetting
+                        ? null
+                        : _onBiometricSwitchChanged,
+                    activeColor: AppColors.primary,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             _SectionCard(
