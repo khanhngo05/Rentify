@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HomeViewModel _viewModel;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  int _lastTabIndex = 0;
+  int _orderRefreshSignal = 0;
 
   @override
   void initState() {
@@ -49,6 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onModelChanged() {
     if (!mounted) return;
+    final currentTab = _viewModel.selectedTabIndex;
+    if (_lastTabIndex != currentTab && currentTab == 2) {
+      _orderRefreshSignal++;
+    }
+    _lastTabIndex = currentTab;
     setState(() {});
   }
 
@@ -66,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = <Widget>[
       _buildHomeTab(context),
       const BranchScreen(),
-      const OrderScreen(),
+      OrderScreen(refreshSignal: _orderRefreshSignal),
       const ProfileScreen(),
     ];
 

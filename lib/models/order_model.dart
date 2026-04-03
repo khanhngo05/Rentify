@@ -25,16 +25,21 @@ class OrderItem {
   });
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
+    final rentalPrice = _asDouble(data['rentalPricePerDay'] ?? data['pricePerDay']);
+    final deposit = _asDouble(data['depositAmount'] ?? data['depositPrice']);
+    final quantity = _asInt(data['quantity'] ?? 1);
+    final rawSubtotal = _asDouble(data['subtotal']);
+
     return OrderItem(
       productId: data['productId'] ?? '',
-      productName: data['productName'] ?? '',
-      thumbnailUrl: data['thumbnailUrl'] ?? '',
-      selectedSize: data['selectedSize'] ?? '',
-      selectedColor: data['selectedColor'] ?? '',
-      rentalPricePerDay: (data['rentalPricePerDay'] ?? 0).toDouble(),
-      depositAmount: (data['depositAmount'] ?? 0).toDouble(),
-      quantity: (data['quantity'] ?? 1).toInt(),
-      subtotal: (data['subtotal'] ?? 0).toDouble(),
+      productName: (data['productName'] ?? data['name'] ?? '').toString(),
+      thumbnailUrl: (data['thumbnailUrl'] ?? data['imageUrl'] ?? '').toString(),
+      selectedSize: (data['selectedSize'] ?? data['size'] ?? '').toString(),
+      selectedColor: (data['selectedColor'] ?? data['color'] ?? '').toString(),
+      rentalPricePerDay: rentalPrice,
+      depositAmount: deposit,
+      quantity: quantity,
+      subtotal: rawSubtotal > 0 ? rawSubtotal : rentalPrice * quantity,
     );
   }
 
@@ -95,27 +100,32 @@ class OrderModel {
   int get totalItemCount => items.fold(0, (acc, item) => acc + item.quantity);
 
   factory OrderModel.fromFirestore(Map<String, dynamic> data, String id) {
+    final now = DateTime.now();
+    final createdAt = _dateFromDynamic(data['createdAt'], now);
+    final updatedAt = _dateFromDynamic(data['updatedAt'], createdAt);
+    final rentalStartDate = _dateFromDynamic(data['rentalStartDate'] ?? data['startDate'], now);
+    final rentalEndDate = _dateFromDynamic(data['rentalEndDate'] ?? data['endDate'], rentalStartDate);
+
     return OrderModel(
       id: id,
-      userId: data['userId'] ?? '',
-      branchId: data['branchId'] ?? '',
-      branchName: data['branchName'] ?? '',
-      branchAddress: data['branchAddress'] ?? '',
+      userId: (data['userId'] ?? '').toString(),
+      branchId: (data['branchId'] ?? data['branch'] ?? '').toString(),
+      branchName: (data['branchName'] ?? data['branch'] ?? '').toString(),
+      branchAddress: (data['branchAddress'] ?? '').toString(),
       items: (data['items'] as List<dynamic>? ?? [])
-          .map((e) => OrderItem.fromMap(e as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((e) => OrderItem.fromMap(Map<String, dynamic>.from(e)))
           .toList(),
-      rentalStartDate:
-          (data['rentalStartDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      rentalEndDate:
-          (data['rentalEndDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      rentalDays: (data['rentalDays'] ?? 1).toInt(),
-      totalRentalFee: (data['totalRentalFee'] ?? 0).toDouble(),
-      depositPaid: (data['depositPaid'] ?? 0).toDouble(),
-      status: data['status'] ?? 'pending',
-      deliveryAddress: data['deliveryAddress'] ?? '',
-      note: data['note'],
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      rentalStartDate: rentalStartDate,
+      rentalEndDate: rentalEndDate,
+      rentalDays: _asInt(data['rentalDays'] ?? 1),
+      totalRentalFee: _asDouble(data['totalRentalFee'] ?? data['totalRentalPrice']),
+      depositPaid: _asDouble(data['depositPaid'] ?? data['totalDepositPrice']),
+      status: (data['status'] ?? 'pending').toString(),
+      deliveryAddress: (data['deliveryAddress'] ?? data['address'] ?? '').toString(),
+      note: data['note']?.toString(),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -138,4 +148,20 @@ class OrderModel {
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
   }
+}
+
+double _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+int _asInt(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
+}
+
+DateTime _dateFromDynamic(dynamic value, DateTime fallback) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  return fallback;
 }

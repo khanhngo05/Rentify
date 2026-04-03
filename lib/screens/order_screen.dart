@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -14,12 +17,14 @@ class OrderScreen extends StatefulWidget {
     this.appBarTitle = 'Đơn hàng',
     this.loginRequiredMessage = 'Bạn cần đăng nhập để xem đơn hàng.',
     this.emptyMessage = 'Bạn chưa có đơn hàng nào',
+    this.refreshSignal = 0,
   });
 
   final String initialStatusCode;
   final String appBarTitle;
   final String loginRequiredMessage;
   final String emptyMessage;
+  final int refreshSignal;
 
   @override
   State<OrderScreen> createState() => _OrderScreenState();
@@ -40,6 +45,7 @@ class _OrderScreenState extends State<OrderScreen>
   final FirebaseService _firebaseService = FirebaseService();
 
   late final TabController _tabController;
+  StreamSubscription<User?>? _authSubscription;
   Future<List<OrderModel>>? _ordersFuture;
   String? _uid;
 
@@ -54,22 +60,40 @@ class _OrderScreenState extends State<OrderScreen>
       vsync: this,
       initialIndex: initialIndex == -1 ? 0 : initialIndex,
     );
-    _uid = _authService.currentUser?.uid;
-    if (_uid != null) {
-      _ordersFuture = _firebaseService.getOrdersByUser(_uid!);
-    }
+
+    _syncUserAndLoad(_authService.currentUser?.uid);
+    _authSubscription = _authService.authStateChanges.listen((user) {
+      if (!mounted) return;
+      _syncUserAndLoad(user?.uid);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant OrderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.refreshSignal == oldWidget.refreshSignal) return;
+    _reload();
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
+  void _syncUserAndLoad(String? uid) {
+    setState(() {
+      _uid = uid;
+      _ordersFuture = uid == null ? null : _firebaseService.getOrdersByUser(uid);
+    });
+  }
+
   Future<void> _reload() async {
-    final uid = _uid;
+    final uid = _authService.currentUser?.uid ?? _uid;
     if (uid == null) return;
     setState(() {
+      _uid = uid;
       _ordersFuture = _firebaseService.getOrdersByUser(uid);
     });
     await _ordersFuture;
@@ -84,8 +108,8 @@ class _OrderScreenState extends State<OrderScreen>
         map[order.status]!.add(order);
       }
     }
-    for (final entry in map.values) {
-      entry.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    for (final list in map.values) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
     return map;
   }
@@ -103,9 +127,9 @@ class _OrderScreenState extends State<OrderScreen>
       return true;
     } catch (error) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể hủy đơn: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể hủy đơn: $error')));
       return false;
     }
   }
@@ -241,6 +265,7 @@ class _OrderScreenState extends State<OrderScreen>
         );
       },
     );
+
     if (updated == true && mounted) {
       await _reload();
     }
@@ -251,9 +276,7 @@ class _OrderScreenState extends State<OrderScreen>
     if (_uid == null) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.appBarTitle)),
-        body: Center(
-          child: Text(widget.loginRequiredMessage),
-        ),
+        body: Center(child: Text(widget.loginRequiredMessage)),
       );
     }
 
@@ -337,8 +360,7 @@ class _OrderScreenState extends State<OrderScreen>
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.all(16),
                         itemCount: orders.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 10),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final order = orders[index];
                           return Card(
@@ -385,7 +407,10 @@ class _OrderScreenState extends State<OrderScreen>
         children: [
           SizedBox(
             width: 95,
-            child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           Expanded(child: Text(value.trim().isEmpty ? 'Chưa có thông tin' : value)),
         ],

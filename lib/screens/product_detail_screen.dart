@@ -5,6 +5,7 @@ import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/branch_model.dart';
 import '../models/favorite_model.dart';
+import '../models/order_model.dart';
 import '../models/product_model.dart';
 import '../models/review_model.dart';
 import '../services/auth_service.dart';
@@ -41,9 +42,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _favoriteLoading = false;
   bool _isLoadingReviews = false;
   bool _isSubmittingReview = false;
+  bool _isCheckingReviewEligibility = false;
   List<ReviewModel> _reviews = <ReviewModel>[];
   double _averageRating = 0;
   int _reviewCount = 0;
+  OrderModel? _eligibleReviewOrder;
+  String _reviewBlockedMessage =
+      'Bạn chỉ có thể đánh giá sau khi đơn thuê hoàn thành.';
 
   @override
   void initState() {
@@ -61,6 +66,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadBranches();
     _loadFavoriteStatus();
     _loadReviews();
+    _loadReviewEligibility();
   }
 
   @override
@@ -233,12 +239,97 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Future<void> _loadReviewEligibility() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _eligibleReviewOrder = null;
+        _reviewBlockedMessage =
+            'Vui lòng đăng nhập để đánh giá sản phẩm đã thuê.';
+        _isCheckingReviewEligibility = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingReviewEligibility = true;
+    });
+
+    try {
+      final completedOrders = await _firebaseService.getCompletedOrdersByUser(
+        user.uid,
+      );
+      final userReviews = await _firebaseService.getReviewsByUserAndProduct(
+        user.uid,
+        widget.product.id,
+      );
+      if (!mounted) return;
+
+      final reviewedOrderIds = userReviews
+          .map((review) => review.orderId.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final ordersWithProduct = completedOrders.where((order) {
+        return order.items.any(
+          (item) => item.productId.trim() == widget.product.id,
+        );
+      }).toList();
+
+      OrderModel? eligibleOrder;
+      for (final order in ordersWithProduct) {
+        if (!reviewedOrderIds.contains(order.id)) {
+          eligibleOrder = order;
+          break;
+        }
+      }
+
+      String blockedMessage;
+      if (eligibleOrder != null) {
+        blockedMessage = '';
+      } else if (ordersWithProduct.isEmpty) {
+        blockedMessage =
+            'Bạn chỉ có thể đánh giá sau khi đơn thuê sản phẩm này hoàn thành.';
+      } else {
+        blockedMessage = 'Bạn đã đánh giá hết các đơn hoàn thành của sản phẩm này.';
+      }
+
+      setState(() {
+        _eligibleReviewOrder = eligibleOrder;
+        _reviewBlockedMessage = blockedMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _eligibleReviewOrder = null;
+        _reviewBlockedMessage =
+            'Không thể kiểm tra điều kiện đánh giá lúc này.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingReviewEligibility = false;
+      });
+    }
+  }
+
   Future<void> _showReviewDialog() async {
-    if (_isSubmittingReview) return;
+    if (_isSubmittingReview || _isCheckingReviewEligibility) return;
 
     final user = _authService.currentUser;
     if (user == null) {
       _showMessage('Vui lòng đăng nhập để đánh giá sản phẩm');
+      return;
+    }
+
+    final eligibleOrder = _eligibleReviewOrder;
+    if (eligibleOrder == null) {
+      _showMessage(
+        _reviewBlockedMessage.isEmpty
+            ? 'Bạn chưa đủ điều kiện để đánh giá sản phẩm này.'
+            : _reviewBlockedMessage,
+      );
       return;
     }
 
@@ -257,9 +348,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final review = ReviewModel(
         id: '',
         productId: widget.product.id,
-        branchId: _selectedBranch?.id ?? '',
+        branchId: eligibleOrder.branchId,
         userId: user.uid,
-        orderId: '',
+        orderId: eligibleOrder.id,
         rating: draft.rating,
         comment: draft.comment?.trim().isEmpty == true
             ? null
@@ -271,6 +362,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       await _firebaseService.createReview(review);
       if (!mounted) return;
       await _loadReviews();
+      await _loadReviewEligibility();
       _showMessage('Đã gửi đánh giá thành công');
     } catch (_) {
       if (!mounted) return;
@@ -299,6 +391,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final product = widget.product;
     final canRent =
         _selectedBranch != null && !_isOutOfStock(_selectedBranch!.id);
+    final canSubmitReview = _eligibleReviewOrder != null;
+    final reviewButtonEnabled =
+        canSubmitReview && !_isSubmittingReview && !_isCheckingReviewEligibility;
+    // ignore: unused_local_variable
+    final reviewButtonLabel = _isSubmittingReview
+        ? 'Đang gửi đánh giá...'
+        : _isCheckingReviewEligibility
+            ? 'Đang kiểm tra điều kiện...'
+            : canSubmitReview
+                ? 'Đánh giá sản phẩm'
+                : 'Chưa đủ điều kiện đánh giá';
 
     return Scaffold(
       appBar: AppBar(
@@ -588,8 +691,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.primary),
                     ),
-                    onPressed: _isSubmittingReview ? null : _showReviewDialog,
-                    icon: _isSubmittingReview
+                    onPressed: reviewButtonEnabled ? _showReviewDialog : null,
+                    icon: (_isSubmittingReview || _isCheckingReviewEligibility)
                         ? const SizedBox(
                             width: 14,
                             height: 14,
@@ -604,6 +707,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                if (!canSubmitReview &&
+                    !_isCheckingReviewEligibility &&
+                    _reviewBlockedMessage.trim().isNotEmpty)
+                  Text(
+                    _reviewBlockedMessage,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                if (!canSubmitReview &&
+                    !_isCheckingReviewEligibility &&
+                    _reviewBlockedMessage.trim().isNotEmpty)
+                  const SizedBox(height: 10),
                 if (_isLoadingReviews)
                   const LinearProgressIndicator(minHeight: 3)
                 else if (_reviews.isEmpty)
@@ -725,6 +842,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 product: product,
                                 selectedSize: _selectedSize,
                                 selectedColor: _selectedColor,
+                                selectedBranchId: _selectedBranch?.id,
                               ),
                             ),
                           );
