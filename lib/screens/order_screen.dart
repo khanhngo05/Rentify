@@ -53,6 +53,7 @@ class _OrderScreenState extends State<OrderScreen>
   final Map<String, bool> _reviewedByOrderItem = <String, bool>{};
   final Set<String> _reviewCheckingKeys = <String>{};
   final Set<String> _reviewSubmittingKeys = <String>{};
+  final Set<String> _reviewCheckQueuedKeys = <String>{};
 
   @override
   void initState() {
@@ -96,6 +97,7 @@ class _OrderScreenState extends State<OrderScreen>
         _reviewedByOrderItem.clear();
         _reviewCheckingKeys.clear();
         _reviewSubmittingKeys.clear();
+        _reviewCheckQueuedKeys.clear();
       }
     });
   }
@@ -106,6 +108,9 @@ class _OrderScreenState extends State<OrderScreen>
     setState(() {
       _uid = uid;
       _ordersFuture = _firebaseService.getOrdersByUser(uid);
+      _reviewCheckingKeys.clear();
+      _reviewSubmittingKeys.clear();
+      _reviewCheckQueuedKeys.clear();
     });
     await _ordersFuture;
   }
@@ -133,33 +138,52 @@ class _OrderScreenState extends State<OrderScreen>
     if (uid == null) return;
 
     final key = _reviewKey(order.id, item.productId);
-    if (_reviewedByOrderItem.containsKey(key) || _reviewCheckingKeys.contains(key)) {
+    if (_reviewedByOrderItem.containsKey(key) ||
+        _reviewCheckingKeys.contains(key) ||
+        _reviewCheckQueuedKeys.contains(key)) {
       return;
     }
 
-    setState(() {
-      _reviewCheckingKeys.add(key);
-    });
+    _reviewCheckQueuedKeys.add(key);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        _reviewCheckQueuedKeys.remove(key);
+        return;
+      }
 
-    _firebaseService
-        .hasReviewForOrderItem(
-          userId: uid,
-          orderId: order.id,
-          productId: item.productId,
-        )
-        .then((hasReviewed) {
-          if (!mounted) return;
-          setState(() {
-            _reviewedByOrderItem[key] = hasReviewed;
-            _reviewCheckingKeys.remove(key);
+      if (_reviewedByOrderItem.containsKey(key) || _reviewCheckingKeys.contains(key)) {
+        _reviewCheckQueuedKeys.remove(key);
+        return;
+      }
+
+      setState(() {
+        _reviewCheckingKeys.add(key);
+      });
+
+      _firebaseService
+          .hasReviewForOrderItem(
+            userId: uid,
+            orderId: order.id,
+            productId: item.productId,
+          )
+          .timeout(const Duration(seconds: 12))
+          .then((hasReviewed) {
+            if (!mounted) return;
+            setState(() {
+              _reviewedByOrderItem[key] = hasReviewed;
+              _reviewCheckingKeys.remove(key);
+            });
+          })
+          .catchError((_) {
+            if (!mounted) return;
+            setState(() {
+              _reviewCheckingKeys.remove(key);
+            });
+          })
+          .whenComplete(() {
+            _reviewCheckQueuedKeys.remove(key);
           });
-        })
-        .catchError((_) {
-          if (!mounted) return;
-          setState(() {
-            _reviewCheckingKeys.remove(key);
-          });
-        });
+    });
   }
 
   Future<void> _showReviewDialogForItem(OrderModel order, OrderItem item) async {
