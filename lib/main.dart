@@ -11,10 +11,10 @@ import 'models/user_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
 import 'providers/cart_provider.dart'; // Phần bạn thêm: Import CartProvider của bạn
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,9 +34,7 @@ void main() async {
   // Phần bạn thêm: Bọc ứng dụng trong MultiProvider để Giỏ hàng hoạt động xuyên suốt
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => CartProvider()),
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => CartProvider())],
       child: const RentifyApp(),
     ),
   );
@@ -51,7 +49,7 @@ class RentifyApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const AuthGate(),
+      home: const SplashScreen(nextScreen: AuthGate(), durationSeconds: 2),
     );
   }
 }
@@ -99,7 +97,7 @@ class _AuthGateState extends State<AuthGate> {
             }
 
             final userModel = userSnapshot.data;
-            
+
             // Nếu là admin thì vào AdminMainScreen
             if (userModel != null && userModel.isAdmin) {
               return const AdminMainScreen();
