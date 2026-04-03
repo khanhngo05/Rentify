@@ -214,15 +214,32 @@ class FirebaseService {
 
   /// Lấy lịch sử đơn thuê của 1 user
   Future<List<OrderModel>> getOrdersByUser(String userId) async {
-    final snapshot = await _db
-        .collection(AppConstants.ordersCollection)
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi chua tao index cho userId + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      final orders = snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
+    }
   }
 
   /// Lấy 1 đơn thuê theo ID
