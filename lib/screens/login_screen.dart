@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
 import '../services/auth_service.dart';
-import '../services/biometric_preference_service.dart';
-import '../services/biometric_service.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,9 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  final BiometricService _biometricService = BiometricService();
-  final BiometricPreferenceService _biometricPreferenceService =
-      BiometricPreferenceService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -48,8 +43,6 @@ class _LoginScreenState extends State<LoginScreen> {
         _showError('Đăng nhập thất bại. Kiểm tra lại thông tin.');
         return;
       }
-
-      await _enforceBiometricAfterLoginIfEnabled();
     } on FirebaseAuthException catch (e) {
       if (mounted) _showError(_getErrorMessage(e.code));
     } catch (e) {
@@ -68,85 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) _showError(_getErrorMessage(e.code));
     } catch (e) {
       if (mounted) _showError('Đăng nhập Google thất bại.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _enforceBiometricAfterLoginIfEnabled() async {
-    final current = _authService.currentUser;
-    if (current == null) {
-      return;
-    }
-
-    final isBiometricEnabled = await _biometricPreferenceService
-        .isEnabledForUser(current.uid);
-    if (!isBiometricEnabled) {
-      return;
-    }
-
-    final result = await _biometricService.authenticateForLogin();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (result == BiometricAuthResult.verified) {
-      return;
-    }
-
-    await _authService.signOut();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (result == BiometricAuthResult.unavailable) {
-      _showError('Vui lòng kích hoạt Face ID để đăng nhập.');
-      return;
-    }
-
-    _showError('Xác thực sinh trắc học thất bại.');
-  }
-
-  Future<void> _handleBiometricCheck() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final enabled = await _biometricPreferenceService
-          .isBiometricLoginEnabled();
-      if (!enabled) {
-        _showError('Vui lòng kích hoạt Face ID.');
-        return;
-      }
-
-      final result = await _biometricService.authenticateForLogin();
-      if (!mounted) {
-        return;
-      }
-
-      if (result == BiometricAuthResult.verified) {
-        await _authService.signInWithGoogle(
-          forceAccountSelection: false,
-          silentOnly: true,
-        );
-        return;
-      }
-
-      if (result == BiometricAuthResult.unavailable) {
-        _showError('Vui lòng kích hoạt Face ID để tiếp tục.');
-        return;
-      }
-
-      _showError('Xác thực sinh trắc học thất bại.');
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        _showError(_getErrorMessage(e.code));
-      }
-    } catch (_) {
-      if (mounted) {
-        _showError('Không thể xác thực sinh trắc học. Vui lòng thử lại.');
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -178,8 +92,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Lỗi kết nối mạng.';
       case 'sign_in_canceled':
         return 'Bạn đã hủy đăng nhập Google.';
-      case 'silent_sign_in_unavailable':
-        return 'Bạn cần đăng nhập Google lần đầu để bật đăng nhập bằng Face ID.';
       default:
         return 'Đăng nhập thất bại ($code).';
     }
@@ -383,34 +295,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               label: const Text(
                                 'Tiếp tục với Google',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppColors.border),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Biometric Button
-                          SizedBox(
-                            height: 50,
-                            child: OutlinedButton.icon(
-                              onPressed: _isLoading
-                                  ? null
-                                  : _handleBiometricCheck,
-                              icon: const Icon(
-                                Icons.fingerprint_rounded,
-                                color: AppColors.textSecondary,
-                              ),
-                              label: const Text(
-                                'Xác thực Face ID / vân tay',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w500,

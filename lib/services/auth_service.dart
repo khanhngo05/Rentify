@@ -8,8 +8,22 @@ import '../models/user_model.dart';
 
 /// Service xu ly dang nhap, dang ky, dang xuat.
 class AuthService {
+  static String? _pendingPostLoginBypassUid;
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  void _markPostLoginBypass(String uid) {
+    _pendingPostLoginBypassUid = uid;
+  }
+
+  bool consumePostLoginBypass(String uid) {
+    if (_pendingPostLoginBypassUid == uid) {
+      _pendingPostLoginBypassUid = null;
+      return true;
+    }
+    return false;
+  }
 
   /// User hien tai (null neu chua dang nhap).
   User? get currentUser => _auth.currentUser;
@@ -42,6 +56,8 @@ class AuthService {
       );
     }
 
+    _markPostLoginBypass(firebaseUser.uid);
+
     return _upsertUserFromFirebaseUser(
       firebaseUser,
       fallbackEmail: email,
@@ -62,6 +78,8 @@ class AuthService {
 
     final firebaseUser = credential.user;
     if (firebaseUser == null) return null;
+
+    _markPostLoginBypass(firebaseUser.uid);
 
     return _upsertUserFromFirebaseUser(firebaseUser, fallbackEmail: email);
   }
@@ -135,6 +153,8 @@ class AuthService {
         message: 'Dang nhap Google khong thanh cong.',
       );
     }
+
+    _markPostLoginBypass(firebaseUser.uid);
 
     return _upsertUserFromFirebaseUser(firebaseUser);
   }

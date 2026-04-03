@@ -8,11 +8,13 @@ import 'constants/app_constants.dart';
 import 'constants/app_theme.dart';
 import 'firebase_options.dart';
 import 'models/user_model.dart';
+import 'screens/biometric_unlock_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
+import 'services/biometric_preference_service.dart';
 import 'services/firebase_service.dart';
 import 'providers/cart_provider.dart'; // Phần bạn thêm: Import CartProvider của bạn
 
@@ -63,7 +65,84 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   final AuthService _authService = AuthService();
+  final BiometricPreferenceService _biometricPreferenceService =
+      BiometricPreferenceService();
   final FirebaseService _firebaseService = FirebaseService();
+
+  bool _biometricVerified = false;
+  String? _verifiedUserId;
+  bool _postLoginBypassGranted = false;
+  String? _postLoginBypassUid;
+  bool _forceShowLoginFormWhenLoggedOut = false;
+  bool _isSigningOutForDisabledBiometric = false;
+
+  void _markBiometricVerified(String uid) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _biometricVerified = true;
+      _verifiedUserId = uid;
+    });
+  }
+
+  Future<void> _forceSignOutForDisabledBiometric(User user) async {
+    if (_isSigningOutForDisabledBiometric) {
+      return;
+    }
+
+    _isSigningOutForDisabledBiometric = true;
+    try {
+      if (_authService.currentUser?.uid == user.uid) {
+        await _authService.signOut();
+      }
+    } finally {
+      _isSigningOutForDisabledBiometric = false;
+    }
+  }
+
+  bool _canBypassBiometricForUser(User user) {
+    if (_postLoginBypassUid != user.uid) {
+      _postLoginBypassUid = user.uid;
+      _postLoginBypassGranted = false;
+    }
+
+    if (!_postLoginBypassGranted) {
+      _postLoginBypassGranted = _authService.consumePostLoginBypass(user.uid);
+    }
+
+    return _postLoginBypassGranted;
+  }
+
+  Widget _buildAuthorizedArea(User user) {
+    // Load giỏ hàng khi user đăng nhập và đã qua bước xác thực sinh trắc học
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CartProvider>().loadCart();
+    });
+
+    // Kiểm tra role của user để phân luồng
+    return FutureBuilder<UserModel?>(
+      future: _firebaseService.getUserById(user.uid),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final userModel = userSnapshot.data;
+
+        // Nếu là admin thì vào AdminMainScreen
+        if (userModel != null && userModel.isAdmin) {
+          return const AdminMainScreen();
+        }
+
+        // User thường vào HomeScreen
+        return const HomeScreen(initialTabIndex: 0);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,33 +157,120 @@ class _AuthGateState extends State<AuthGate> {
 
         final user = snapshot.data;
         if (user == null) {
-          return const LoginScreen();
+          _biometricVerified = false;
+          _verifiedUserId = null;
+          _postLoginBypassGranted = false;
+          _postLoginBypassUid = null;
+
+          if (_forceShowLoginFormWhenLoggedOut) {
+            return const LoginScreen();
+          }
+
+          return FutureBuilder<RememberedUserProfile?>(
+            future: _biometricPreferenceService.getRememberedUserProfile(),
+            builder: (context, rememberedSnapshot) {
+              if (rememberedSnapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              final remembered = rememberedSnapshot.data;
+              if (remembered == null) {
+                return const LoginScreen();
+              }
+
+              return FutureBuilder<bool>(
+                future: _biometricPreferenceService.isEnabledForUser(
+                  remembered.uid,
+                ),
+                builder: (context, enabledSnapshot) {
+                  if (enabledSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Scaffold(
+                      body: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final enabled = enabledSnapshot.data ?? false;
+                  if (!enabled) {
+                    return const LoginScreen();
+                  }
+
+                  return BiometricUnlockScreen(
+                    displayName: remembered.displayName,
+                    userUid: remembered.uid,
+                    avatarUrl: remembered.avatarUrl,
+                    email: remembered.email,
+                    onVerified: () async {
+                      _markBiometricVerified(remembered.uid);
+                      await _authService.signInWithGoogle(
+                        forceAccountSelection: false,
+                        silentOnly: true,
+                      );
+                    },
+                    onUseAnotherAccount: () async {
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(() {
+                        _forceShowLoginFormWhenLoggedOut = true;
+                      });
+                    },
+                  );
+                },
+              );
+            },
+          );
         }
 
-        // Load giỏ hàng khi user đăng nhập
+        _forceShowLoginFormWhenLoggedOut = false;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.read<CartProvider>().loadCart();
+          _biometricPreferenceService.saveRememberedUserProfile(user);
         });
 
-        // Kiểm tra role của user để phân luồng
-        return FutureBuilder<UserModel?>(
-          future: _firebaseService.getUserById(user.uid),
-          builder: (context, userSnapshot) {
-            if (userSnapshot.connectionState == ConnectionState.waiting) {
+        final isVerifiedForCurrentUser =
+            _biometricVerified && _verifiedUserId == user.uid;
+
+        return FutureBuilder<bool>(
+          future: _biometricPreferenceService.isEnabledForUser(user.uid),
+          builder: (context, biometricSettingSnapshot) {
+            if (biometricSettingSnapshot.connectionState ==
+                ConnectionState.waiting) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
-            final userModel = userSnapshot.data;
+            final biometricEnabled = biometricSettingSnapshot.data ?? false;
+            if (!biometricEnabled) {
+              if (_canBypassBiometricForUser(user)) {
+                return _buildAuthorizedArea(user);
+              }
 
-            // Nếu là admin thì vào AdminMainScreen
-            if (userModel != null && userModel.isAdmin) {
-              return const AdminMainScreen();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _forceSignOutForDisabledBiometric(user);
+              });
+              return const LoginScreen();
             }
 
-            // User thường vào HomeScreen
-            return const HomeScreen(initialTabIndex: 0);
+            if (!isVerifiedForCurrentUser) {
+              return BiometricUnlockScreen(
+                displayName: user.displayName ?? user.email ?? 'Rentify User',
+                userUid: user.uid,
+                avatarUrl: user.photoURL,
+                email: user.email,
+                onVerified: () async {
+                  _markBiometricVerified(user.uid);
+                },
+                onUseAnotherAccount: () async {
+                  await _authService.signOut();
+                },
+              );
+            }
+
+            return _buildAuthorizedArea(user);
           },
         );
       },
