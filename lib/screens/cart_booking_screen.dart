@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../models/cart_item_model.dart';
 import '../providers/cart_provider.dart';
 import '../models/order_model.dart';
 import '../services/firebase_service.dart';
@@ -16,11 +17,13 @@ class CartBookingScreen extends StatefulWidget {
     required this.branchId,
     required this.branchName,
     required this.branchAddress,
+    this.directItems,
   });
 
   final String branchId;
   final String branchName;
   final String branchAddress;
+  final List<CartItemModel>? directItems;
 
   @override
   State<CartBookingScreen> createState() => _CartBookingScreenState();
@@ -41,6 +44,26 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
 
   int get _rentalDays =>
       _rentalRange.end.difference(_rentalRange.start).inDays + 1;
+
+  bool get _isDirectCheckout => widget.directItems != null;
+
+  List<CartItemModel> _effectiveItems(CartProvider cartProvider) {
+    return _isDirectCheckout ? widget.directItems! : cartProvider.cartItems;
+  }
+
+  double _totalRentalPerDay(List<CartItemModel> items) {
+    return items.fold<double>(
+      0,
+      (sum, item) => sum + (item.rentalPricePerDay * item.quantity),
+    );
+  }
+
+  double _totalDeposit(List<CartItemModel> items) {
+    return items.fold<double>(
+      0,
+      (sum, item) => sum + (item.depositPrice * item.quantity),
+    );
+  }
 
   @override
   void initState() {
@@ -150,7 +173,8 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
     }
 
     final cartProvider = context.read<CartProvider>();
-    if (cartProvider.cartItems.isEmpty) {
+    final bookingItems = _effectiveItems(cartProvider);
+    if (bookingItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Giỏ hàng trống!')),
       );
@@ -160,11 +184,12 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final rentalFee = cartProvider.totalRentalPrice * _rentalDays;
+      final rentalFee = _totalRentalPerDay(bookingItems) * _rentalDays;
+      final totalDeposit = _totalDeposit(bookingItems);
       final now = DateTime.now();
 
       // Chuyển đổi CartItems sang OrderItems
-      final orderItems = cartProvider.cartItems.map((cartItem) {
+      final orderItems = bookingItems.map((cartItem) {
         return OrderItem(
           productId: cartItem.productId,
           productName: cartItem.productName,
@@ -190,7 +215,7 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
         rentalEndDate: _rentalRange.end,
         rentalDays: _rentalDays,
         totalRentalFee: rentalFee,
-        depositPaid: cartProvider.totalDepositPrice,
+        depositPaid: totalDeposit,
         status: 'pending',
         deliveryAddress: _receiverAddress!,
         note: 'Người nhận: $_receiverName - SĐT: $_receiverPhone',
@@ -204,8 +229,10 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
 
       if (!mounted) return;
 
-      // Xóa giỏ hàng sau khi đặt thành công
-      cartProvider.clearCart();
+      // Chỉ xóa giỏ khi đi từ luồng giỏ hàng.
+      if (!_isDirectCheckout) {
+        await cartProvider.clearCart();
+      }
 
       // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
@@ -233,22 +260,28 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
   @override
   Widget build(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
-    final cartItems = cartProvider.cartItems;
+    final cartItems = _effectiveItems(cartProvider);
 
     if (cartItems.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Thuê từ giỏ hàng')),
+        appBar: AppBar(
+          title: Text(_isDirectCheckout ? 'Thuê ngay' : 'Thuê từ giỏ hàng'),
+        ),
         body: const Center(
           child: Text('Giỏ hàng trống!'),
         ),
       );
     }
 
-    final rentalFee = cartProvider.totalRentalPrice * _rentalDays;
-    final total = rentalFee + cartProvider.totalDepositPrice;
+    final totalRentalPerDay = _totalRentalPerDay(cartItems);
+    final totalDeposit = _totalDeposit(cartItems);
+    final rentalFee = totalRentalPerDay * _rentalDays;
+    final total = rentalFee + totalDeposit;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thuê từ giỏ hàng')),
+      appBar: AppBar(
+        title: Text(_isDirectCheckout ? 'Thuê ngay' : 'Thuê từ giỏ hàng'),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
@@ -419,7 +452,7 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
               children: [
                 _PriceRow(
                   label: 'Tạm tính thuê (1 ngày)',
-                  value: AppConstants.formatPrice(cartProvider.totalRentalPrice),
+                  value: AppConstants.formatPrice(totalRentalPerDay),
                 ),
                 _PriceRow(
                   label: 'Phí thuê ($_rentalDays ngày)',
@@ -427,7 +460,7 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
                 ),
                 _PriceRow(
                   label: 'Tiền đặt cọc',
-                  value: AppConstants.formatPrice(cartProvider.totalDepositPrice),
+                  value: AppConstants.formatPrice(totalDeposit),
                 ),
                 const Divider(height: 20),
                 _PriceRow(
