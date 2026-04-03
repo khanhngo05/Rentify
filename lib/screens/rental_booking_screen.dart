@@ -47,8 +47,8 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         if (doc.exists) {
           final data = doc.data()!;
           setState(() {
-            _nameController.text = data['name'] ?? data['fullName'] ?? '';
-            _phoneController.text = data['phone'] ?? data['phoneNumber'] ?? '';
+            _nameController.text = data['displayName'] ?? '';
+            _phoneController.text = data['phoneNumber'] ?? '';
             _addressController.text = data['address'] ?? '';
           });
         }
