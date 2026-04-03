@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../constants/app_constants.dart';
 import '../../models/cart_item_model.dart';
 import '../../providers/cart_provider.dart';
 
@@ -55,8 +56,8 @@ class AddToCartDialog extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text('Size: $selectedSize | Màu: $selectedColor'),
-          Text('Giá thuê: $rentalPrice đ/ngày'),
-          Text('Cọc: $depositPrice đ'),
+          Text('Giá thuê: ${AppConstants.formatPrice(rentalPrice)}/ngày'),
+          Text('Cọc: ${AppConstants.formatPrice(depositPrice)}'),
         ],
       ),
       actions: [
