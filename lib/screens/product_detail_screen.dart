@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/branch_model.dart';
 import '../models/favorite_model.dart';
 import '../models/product_model.dart';
+import '../models/review_model.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'rental_booking_screen.dart';
+// Phần cấy thêm: Import Dialog giỏ hàng của Dũng (Nhớ báo Giang check lại đường dẫn nếu file để ở thư mục khác)
+import '../widgets/common/add_to_cart_dialog.dart'; 
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({super.key, required this.product});
@@ -35,6 +39,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool _isFavorite = false;
   bool _favoriteLoading = false;
+  bool _isLoadingReviews = false;
+  bool _isSubmittingReview = false;
+  List<ReviewModel> _reviews = <ReviewModel>[];
+  double _averageRating = 0;
+  int _reviewCount = 0;
 
   @override
   void initState() {
@@ -47,8 +56,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _selectedColor = widget.product.colors.isNotEmpty
         ? widget.product.colors.first
         : '';
+    _averageRating = widget.product.rating;
+    _reviewCount = widget.product.reviewCount;
     _loadBranches();
     _loadFavoriteStatus();
+    _loadReviews();
   }
 
   @override
@@ -186,6 +198,100 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _loadReviews() async {
+    setState(() {
+      _isLoadingReviews = true;
+    });
+
+    try {
+      final reviews = await _firebaseService.getReviewsByProduct(widget.product.id);
+      if (!mounted) return;
+
+      double average = 0;
+      if (reviews.isNotEmpty) {
+        final total = reviews.fold<int>(0, (sum, item) => sum + item.rating);
+        average = total / reviews.length;
+      }
+
+      setState(() {
+        _reviews = reviews;
+        _reviewCount = reviews.length;
+        _averageRating = reviews.isEmpty
+            ? widget.product.rating
+            : double.parse(average.toStringAsFixed(1));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không thể tải đánh giá sản phẩm');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingReviews = false;
+      });
+    }
+  }
+
+  Future<void> _showReviewDialog() async {
+    if (_isSubmittingReview) return;
+
+    final user = _authService.currentUser;
+    if (user == null) {
+      _showMessage('Vui lòng đăng nhập để đánh giá sản phẩm');
+      return;
+    }
+
+    final draft = await showDialog<_ReviewDraft>(
+      context: context,
+      builder: (_) => const _ReviewInputDialog(),
+    );
+
+    if (draft == null) return;
+
+    setState(() {
+      _isSubmittingReview = true;
+    });
+
+    try {
+      final review = ReviewModel(
+        id: '',
+        productId: widget.product.id,
+        branchId: _selectedBranch?.id ?? '',
+        userId: user.uid,
+        orderId: '',
+        rating: draft.rating,
+        comment: draft.comment?.trim().isEmpty == true
+            ? null
+            : draft.comment?.trim(),
+        photoUrls: const <String>[],
+        createdAt: DateTime.now(),
+      );
+
+      await _firebaseService.createReview(review);
+      if (!mounted) return;
+      await _loadReviews();
+      _showMessage('Đã gửi đánh giá thành công');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không thể gửi đánh giá lúc này');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSubmittingReview = false;
+      });
+    }
+  }
+
+  String _formatReviewDate(DateTime value) {
+    return DateFormat(AppConstants.dateTimeFormat).format(value);
+  }
+
+  String _reviewUserLabel(String userId) {
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return 'Người dùng';
+    if (trimmed.length <= 6) return trimmed;
+    return 'User ${trimmed.substring(0, 6)}';
   }
 
   @override
@@ -465,16 +571,101 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const Icon(Icons.star_rounded, color: AppColors.star),
                     const SizedBox(width: 6),
                     Text(
-                      product.rating.toStringAsFixed(1),
+                      _averageRating.toStringAsFixed(1),
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '(${product.reviewCount} review)',
+                      '($_reviewCount đánh giá)',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                    onPressed: _isSubmittingReview ? null : _showReviewDialog,
+                    icon: _isSubmittingReview
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.rate_review_outlined),
+                    label: Text(
+                      _isSubmittingReview
+                          ? 'Đang gửi đánh giá...'
+                          : 'Đánh giá sản phẩm',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (_isLoadingReviews)
+                  const LinearProgressIndicator(minHeight: 3)
+                else if (_reviews.isEmpty)
+                  const Text(
+                    'Chưa có đánh giá nào cho sản phẩm này.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  )
+                else
+                  Column(
+                    children: _reviews.take(5).map((review) {
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  _reviewUserLabel(review.userId),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _formatReviewDate(review.createdAt),
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 2,
+                              children: List.generate(5, (index) {
+                                return Icon(
+                                  index < review.rating
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  size: 16,
+                                  color: AppColors.star,
+                                );
+                              }),
+                            ),
+                            if ((review.comment ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(review.comment!.trim()),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
               ],
             ),
           ),
@@ -483,25 +674,163 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: canRent
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RentalBookingScreen(
-                          product: product,
-                          selectedSize: _selectedSize,
-                          selectedColor: _selectedColor,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            child: const Text('Thuê ngay'),
+          // Phần cấy thêm: Sửa nút Thuê ngay độc lập thành 1 Row chứa cả 2 nút
+          child: Row(
+            children: [
+              // Nút Thêm vào giỏ (Gọi AddToCartDialog của Dũng)
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: AppColors.primary),
+                  ),
+                  onPressed: canRent
+                      ? () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AddToCartDialog(
+                              productId: product.id,
+                              productName: product.name,
+                              imageUrl: product.thumbnailUrl,
+                              rentalPrice: product.rentalPricePerDay.toDouble(),
+                              depositPrice: product.depositAmount.toDouble(),
+                              selectedSize: _selectedSize,
+                              selectedColor: _selectedColor,
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text(
+                    'Thêm vào giỏ',
+                    style: TextStyle(
+                      color: AppColors.primary, 
+                      fontWeight: FontWeight.bold
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Nút Thuê ngay (Giữ nguyên logic gốc của Giang)
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: canRent
+                      ? () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RentalBookingScreen(
+                                product: product,
+                                selectedSize: _selectedSize,
+                                selectedColor: _selectedColor,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text(
+                    'Thuê ngay',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ReviewDraft {
+  const _ReviewDraft({required this.rating, this.comment});
+
+  final int rating;
+  final String? comment;
+}
+
+class _ReviewInputDialog extends StatefulWidget {
+  const _ReviewInputDialog();
+
+  @override
+  State<_ReviewInputDialog> createState() => _ReviewInputDialogState();
+}
+
+class _ReviewInputDialogState extends State<_ReviewInputDialog> {
+  int _rating = 5;
+  final TextEditingController _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(
+      _ReviewDraft(
+        rating: _rating,
+        comment: _commentController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đánh giá sản phẩm'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mức độ hài lòng'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              children: List.generate(5, (index) {
+                final star = index + 1;
+                return IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _rating = star;
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    star <= _rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: AppColors.star,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _commentController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Nhận xét (không bắt buộc)',
+                alignLabelWithHint: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _submit,
+          child: const Text('Gửi'),
+        ),
+      ],
     );
   }
 }

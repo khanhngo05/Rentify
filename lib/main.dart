@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:provider/provider.dart'; // Phần bạn thêm: Import thư viện Provider
 
 import 'constants/app_constants.dart';
 import 'constants/app_theme.dart';
@@ -12,6 +13,8 @@ import 'screens/login_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
 import 'services/auth_service.dart';
 import 'services/firebase_service.dart';
+import 'providers/cart_provider.dart'; // Phần bạn thêm: Import CartProvider của bạn
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +31,15 @@ void main() async {
     debugPrint('Supabase init error: $e');
   }
 
-  runApp(const RentifyApp());
+  // Phần bạn thêm: Bọc ứng dụng trong MultiProvider để Giỏ hàng hoạt động xuyên suốt
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
+      child: const RentifyApp(),
+    ),
+  );
 }
 
 class RentifyApp extends StatelessWidget {

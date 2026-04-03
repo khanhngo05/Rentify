@@ -1,530 +1,308 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
-import '../constants/app_colors.dart';
-import '../constants/app_constants.dart';
-import '../models/product_model.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../providers/cart_provider.dart';
 
 class RentalBookingScreen extends StatefulWidget {
-  const RentalBookingScreen({
-    super.key,
-    required this.product,
-    required this.selectedSize,
-    required this.selectedColor,
-  });
+  final dynamic product; 
+  final String? selectedSize;
+  final String? selectedColor;
 
-  final Product product;
-  final String selectedSize;
-  final String selectedColor;
+  const RentalBookingScreen({
+    Key? key,
+    this.product,
+    this.selectedSize,
+    this.selectedColor,
+  }) : super(key: key);
 
   @override
   State<RentalBookingScreen> createState() => _RentalBookingScreenState();
 }
 
 class _RentalBookingScreenState extends State<RentalBookingScreen> {
-  late DateTimeRange _rentalRange;
-  String? _receiverName;
-  String? _receiverPhone;
-  String? _receiverAddress;
-
-  bool get _hasReceiverInfo {
-    return (_receiverName?.trim().isNotEmpty ?? false) &&
-        (_receiverPhone?.trim().isNotEmpty ?? false) &&
-        (_receiverAddress?.trim().isNotEmpty ?? false);
-  }
-
-  int get _rentalDays =>
-      _rentalRange.end.difference(_rentalRange.start).inDays + 1;
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  
+  DateTimeRange? _selectedDateRange;
+  int _rentalDays = 1;
+  String _selectedBranch = 'Chi nhánh Đống Đa';
+  
+  final List<String> _branches = ['Chi nhánh Đống Đa', 'Chi nhánh Cầu Giấy', 'Chi nhánh Thanh Xuân'];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    _rentalRange = DateTimeRange(start: today, end: today);
+    _fetchUserData();
   }
 
-  String _formatDate(DateTime date) {
-    return DateFormat(AppConstants.dateFormat).format(date);
+  // Tự động lấy dữ liệu User từ Firestore để điền vào Form
+  Future<void> _fetchUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          setState(() {
+            _nameController.text = data['displayName'] ?? '';
+            _phoneController.text = data['phoneNumber'] ?? '';
+            _addressController.text = data['address'] ?? '';
+          });
+        }
+      } catch (e) {
+        debugPrint("Lỗi lấy thông tin user: $e");
+      }
+    }
   }
 
-  Future<void> _showAddressDialog() async {
-    final receiverInfo = await showDialog<_ReceiverInfo>(
+  Future<void> _pickDateRange() async {
+    DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      builder: (_) => _AddressInputDialog(
-        initialName: _receiverName,
-        initialPhone: _receiverPhone,
-        initialAddress: _receiverAddress,
-      ),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 60)),
     );
 
-    if (!mounted || receiverInfo == null) return;
-
-    setState(() {
-      _receiverName = receiverInfo.name;
-      _receiverPhone = receiverInfo.phone;
-      _receiverAddress = receiverInfo.address;
-    });
+    if (picked != null) {
+      setState(() {
+        _selectedDateRange = picked;
+        _rentalDays = picked.duration.inDays;
+        if (_rentalDays == 0) _rentalDays = 1; 
+      });
+    }
   }
 
-  Future<void> _pickRentalRange() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: today,
-      lastDate: today.add(const Duration(days: 365)),
-      initialDateRange: _rentalRange,
-      helpText: 'Chọn ngày thuê',
-      confirmText: 'Xác nhận',
-      cancelText: 'Hủy',
-      saveText: 'Lưu',
-    );
-
-    if (picked == null) return;
-
-    final selectedDays = picked.end.difference(picked.start).inDays + 1;
-    if (selectedDays < AppConstants.minRentalDays ||
-        selectedDays > AppConstants.maxRentalDays) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Vui lòng chọn từ ${AppConstants.minRentalDays} đến ${AppConstants.maxRentalDays} ngày.',
-          ),
-        ),
-      );
+  Future<void> _submitOrder() async {
+    if (_selectedDateRange == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn thời gian thuê!')));
+      return;
+    }
+    if (_nameController.text.trim().isEmpty || _phoneController.text.trim().isEmpty || _addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng điền đầy đủ thông tin người nhận!')));
       return;
     }
 
-    setState(() {
-      _rentalRange = picked;
-    });
+    setState(() => _isLoading = true);
+
+    try {
+      final cartProvider = context.read<CartProvider>();
+      final user = FirebaseAuth.instance.currentUser;
+      List<Map<String, dynamic>> orderItems = [];
+      double totalRental = 0;
+      double totalDeposit = 0;
+
+      if (widget.product != null) {
+        // Luồng 1: Thuê 1 món trực tiếp từ Detail
+        double price = (widget.product.rentalPricePerDay ?? 0).toDouble();
+        double deposit = (widget.product.depositAmount ?? 0).toDouble();
+        
+        orderItems.add({
+          'productId': widget.product.id ?? '',
+          'productName': widget.product.name ?? 'Sản phẩm thuê',
+          'size': widget.selectedSize ?? 'Free',
+          'color': widget.selectedColor ?? 'Mặc định',
+          'quantity': 1,
+          'pricePerDay': price,
+          'imageUrl': widget.product.thumbnailUrl ?? '', 
+        });
+        totalRental = price;
+        totalDeposit = deposit;
+      } else {
+        // Luồng 2: Thuê từ Giỏ hàng
+        orderItems = cartProvider.cartItems.map((item) => {
+          'productId': item.productId,
+          'productName': item.productName,
+          'size': item.selectedSize,
+          'color': item.selectedColor,
+          'quantity': item.quantity,
+          'pricePerDay': item.rentalPricePerDay,
+          'imageUrl': item.imageUrl,
+        }).toList();
+        totalRental = cartProvider.totalRentalPrice;
+        totalDeposit = cartProvider.totalDepositPrice;
+      }
+
+      // Đóng gói data đẩy lên Firestore
+      final orderData = {
+        'userId': user?.uid ?? 'guest',
+        'customerName': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'address': _addressController.text.trim(),
+        'items': orderItems,
+        'branch': _selectedBranch,
+        'startDate': Timestamp.fromDate(_selectedDateRange!.start),
+        'endDate': Timestamp.fromDate(_selectedDateRange!.end),
+        'rentalDays': _rentalDays,
+        'totalRentalPrice': totalRental * _rentalDays,
+        'totalDepositPrice': totalDeposit,
+        'status': 'pending', 
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      DocumentReference docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
+
+      // Xóa giỏ hàng nếu đi từ luồng giỏ hàng
+      if (widget.product == null) {
+        cartProvider.clearCart();
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tạo đơn thành công! Mã đơn: ${docRef.id}')),
+      );
+      
+      // Đưa user về trang chủ thay vì dùng go_router gây crash
+      Navigator.of(context).popUntil((route) => route.isFirst);
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi chốt đơn: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Widget hiển thị danh sách sản phẩm thu nhỏ
+  Widget _buildProductList(CartProvider cartProvider) {
+    if (widget.product != null) {
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(widget.product.thumbnailUrl ?? '', width: 50, height: 50, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported, size: 50),
+          ),
+        ),
+        title: Text(widget.product.name ?? 'Sản phẩm', maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text('Size: ${widget.selectedSize} | Màu: ${widget.selectedColor}'),
+        trailing: Text('${widget.product.rentalPricePerDay} đ'),
+      );
+    } else {
+      return Column(
+        children: cartProvider.cartItems.map((item) => ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(item.imageUrl, width: 50, height: 50, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported, size: 50),
+            ),
+          ),
+          title: Text(item.productName, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text('Size: ${item.selectedSize} | Màu: ${item.selectedColor} x${item.quantity}'),
+          trailing: Text('${item.rentalPricePerDay * item.quantity} đ'),
+        )).toList(),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final rentalFee = widget.product.rentalPricePerDay * _rentalDays;
-    final total = rentalFee + widget.product.depositAmount;
+    final cartProvider = context.watch<CartProvider>();
+    double displayRental = widget.product != null 
+        ? (widget.product.rentalPricePerDay ?? 0).toDouble() * _rentalDays 
+        : cartProvider.totalRentalPrice * _rentalDays;
+    double displayDeposit = widget.product != null 
+        ? (widget.product.depositAmount ?? 0).toDouble()
+        : cartProvider.totalDepositPrice;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thuê ngay')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
-        children: [
-          GestureDetector(
-            onTap: _showAddressDialog,
-            child: _SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            color: AppColors.primary,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Địa chỉ nhận đồ',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.textHint,
-                        size: 22,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  if (_hasReceiverInfo) ...[
-                    Text(
-                      '${_receiverName!}  •  ${_receiverPhone!}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _receiverAddress!,
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ] else
-                    const Text(
-                      'Chọn địa chỉ',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Sản phẩm thuê',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        widget.product.thumbnailUrl,
-                        width: 84,
-                        height: 84,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 84,
-                          height: 84,
-                          color: AppColors.shimmerBase,
-                          child: const Icon(Icons.image_not_supported_rounded),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Size: ${widget.selectedSize.isEmpty ? 'Chưa chọn' : widget.selectedSize}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Màu: ${widget.selectedColor.isEmpty ? 'Chưa chọn' : widget.selectedColor}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Thời gian thuê',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_month_rounded, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${_formatDate(_rentalRange.start)} - ${_formatDate(_rentalRange.end)}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    FilledButton(
-                      onPressed: _pickRentalRange,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: const Text('Chọn lịch'),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Tổng số ngày thuê: $_rentalDays ngày',
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _SectionCard(
-            child: Column(
-              children: [
-                _PriceRow(
-                  label: 'Giá thuê',
-                  value:
-                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngày',
-                ),
-                _PriceRow(
-                  label: 'Phí thuê ($_rentalDays ngày)',
-                  value: AppConstants.formatPrice(rentalFee),
-                ),
-                _PriceRow(
-                  label: 'Tiền đặt cọc',
-                  value: AppConstants.formatPrice(widget.product.depositAmount),
-                ),
-                const Divider(height: 20),
-                _PriceRow(
-                  label: 'Tổng tạm tính',
-                  value: AppConstants.formatPrice(total),
-                  isEmphasized: true,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Row(
+      appBar: AppBar(title: const Text('Xác nhận đặt thuê')),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tổng cộng',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    Text(
-                      AppConstants.formatPrice(total),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+              // 1. THỜI GIAN THUÊ
+              const Text('Thời gian thuê', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.calendar_month),
+                  title: Text(_selectedDateRange == null 
+                    ? 'Chọn ngày thuê và trả' 
+                    : '${_selectedDateRange!.start.toString().substring(0,10)} đến ${_selectedDateRange!.end.toString().substring(0,10)}'),
+                  subtitle: Text('Số ngày thuê: $_rentalDays ngày'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: _pickDateRange,
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đã chuyển sang màn thuê (P4).'),
-                      ),
-                    );
-                  },
-                  child: const Text('Đặt thuê'),
+              const SizedBox(height: 24),
+
+              // 2. THÔNG TIN SẢN PHẨM
+              const Text('Thông tin sản phẩm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: _buildProductList(cartProvider),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+              const SizedBox(height: 24),
 
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _ReceiverInfo {
-  const _ReceiverInfo({
-    required this.name,
-    required this.phone,
-    required this.address,
-  });
-
-  final String name;
-  final String phone;
-  final String address;
-}
-
-class _AddressInputDialog extends StatefulWidget {
-  const _AddressInputDialog({
-    this.initialName,
-    this.initialPhone,
-    this.initialAddress,
-  });
-
-  final String? initialName;
-  final String? initialPhone;
-  final String? initialAddress;
-
-  @override
-  State<_AddressInputDialog> createState() => _AddressInputDialogState();
-}
-
-class _AddressInputDialogState extends State<_AddressInputDialog> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-  late final TextEditingController _addressController;
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.initialName ?? '');
-    _phoneController = TextEditingController(text: widget.initialPhone ?? '');
-    _addressController = TextEditingController(
-      text: widget.initialAddress ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    Navigator.of(context).pop(
-      _ReceiverInfo(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        address: _addressController.text.trim(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Thông tin nhận hàng'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
+              // 3. THÔNG TIN NGƯỜI NHẬN
+              const Text('Thông tin nhận đồ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedBranch,
+                decoration: const InputDecoration(labelText: 'Chi nhánh phục vụ', border: OutlineInputBorder()),
+                items: _branches.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                onChanged: (val) => setState(() => _selectedBranch = val!),
+              ),
+              const SizedBox(height: 16),
+              TextField(
                 controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Họ và tên'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập họ và tên';
-                  }
-                  return null;
-                },
+                decoration: const InputDecoration(labelText: 'Họ và tên người nhận', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
               ),
-              const SizedBox(height: 10),
-              TextFormField(
+              const SizedBox(height: 16),
+              TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập số điện thoại';
-                  }
-                  return null;
-                },
+                decoration: const InputDecoration(labelText: 'Số điện thoại', border: OutlineInputBorder(), prefixIcon: Icon(Icons.phone)),
               ),
-              const SizedBox(height: 10),
-              TextFormField(
+              const SizedBox(height: 16),
+              TextField(
                 controller: _addressController,
+                decoration: const InputDecoration(labelText: 'Địa chỉ giao hàng (nếu có)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on)),
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Địa chỉ nhận hàng',
-                  alignLabelWithHint: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập địa chỉ nhận hàng';
-                  }
-                  return null;
-                },
               ),
+              const SizedBox(height: 24),
+
+              // 4. TỔNG TIỀN
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [const Text('Tổng tiền thuê:'), Text('$displayRental đ', style: const TextStyle(fontWeight: FontWeight.bold))],
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [const Text('Tiền đặt cọc:'), Text('$displayDeposit đ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red))],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // 5. NÚT CHỐT ĐƠN
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _submitOrder,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade800),
+                  child: const Text('Xác nhận thuê', style: TextStyle(fontSize: 18, color: Colors.white)),
+                ),
+              )
             ],
           ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Hủy'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-          onPressed: _save,
-          child: const Text('Lưu'),
-        ),
-      ],
-    );
-  }
-}
-
-class _PriceRow extends StatelessWidget {
-  const _PriceRow({
-    required this.label,
-    required this.value,
-    this.isEmphasized = false,
-  });
-
-  final String label;
-  final String value;
-  final bool isEmphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontWeight: isEmphasized ? FontWeight.w700 : FontWeight.w500,
-      color: isEmphasized ? AppColors.primary : AppColors.textPrimary,
-      fontSize: isEmphasized ? 16 : 14,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text(value, style: style),
-        ],
-      ),
     );
   }
 }
