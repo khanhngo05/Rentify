@@ -563,7 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Đăng nhập Face ID',
+                          'Kích hoạt Faceid, vân tay',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
