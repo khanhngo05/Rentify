@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_service.dart';
 import 'home_screen.dart';
@@ -25,7 +24,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   bool _isLoading = false;
   File? _selectedImageFile;
-  String? _uploadedAvatarUrl;
 
   @override
   void dispose() {

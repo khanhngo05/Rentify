@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../models/cart_item_model.dart';
 import '../models/branch_model.dart';
 import '../models/favorite_model.dart';
 import '../models/order_model.dart';
 import '../models/product_model.dart';
 import '../models/review_model.dart';
+import '../providers/cart_provider.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
-import 'rental_booking_screen.dart';
+import 'cart_booking_screen.dart';
+import 'multi_cart_booking_screen.dart';
 // Phần cấy thêm: Import Dialog giỏ hàng của Dũng (Nhớ báo Giang check lại đường dẫn nếu file để ở thư mục khác)
 import '../widgets/common/add_to_cart_dialog.dart'; 
 
@@ -204,6 +208,59 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _rentNowWithNewCheckout() async {
+    final selectedBranch = _selectedBranch;
+    if (selectedBranch == null) {
+      _showMessage('Vui lòng chọn chi nhánh trước khi đặt thuê');
+      return;
+    }
+
+    final cartProvider = context.read<CartProvider>();
+    final added = await cartProvider.addToCart(
+      CartItemModel(
+        productId: widget.product.id,
+        productName: widget.product.name,
+        imageUrl: widget.product.thumbnailUrl,
+        selectedSize: _selectedSize,
+        selectedColor: _selectedColor,
+        rentalPricePerDay: widget.product.rentalPricePerDay.toDouble(),
+        depositPrice: widget.product.depositAmount.toDouble(),
+        branchId: selectedBranch.id,
+        branchName: selectedBranch.name,
+        branchAddress: selectedBranch.address,
+        availableStock: _availableStockForBranch(selectedBranch.id),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (!added) {
+      _showMessage('Sản phẩm đã đạt số lượng tồn kho tối đa trong giỏ hàng');
+      return;
+    }
+
+    if (cartProvider.hasMultipleBranches) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const MultiCartBookingScreen(),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CartBookingScreen(
+          branchId: selectedBranch.id,
+          branchName: selectedBranch.name,
+          branchAddress: selectedBranch.address,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadReviews() async {
@@ -810,6 +867,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   onPressed: canRent
                       ? () {
+                          final selectedBranch = _selectedBranch!;
                           showDialog(
                             context: context,
                             builder: (context) => AddToCartDialog(
@@ -820,6 +878,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               depositPrice: product.depositAmount.toDouble(),
                               selectedSize: _selectedSize,
                               selectedColor: _selectedColor,
+                              branchId: selectedBranch.id,
+                              branchName: selectedBranch.name,
+                              branchAddress: selectedBranch.address,
+                              availableStock: _availableStockForBranch(
+                                selectedBranch.id,
+                              ),
                             ),
                           );
                         }
@@ -842,18 +906,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: canRent
-                      ? () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => RentalBookingScreen(
-                                product: product,
-                                selectedSize: _selectedSize,
-                                selectedColor: _selectedColor,
-                                selectedBranchId: _selectedBranch?.id,
-                              ),
-                            ),
-                          );
-                        }
+                      ? _rentNowWithNewCheckout
                       : null,
                   child: const Text(
                     'Thuê ngay',

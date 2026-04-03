@@ -40,18 +40,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = await _authService.signUp(
+      await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
       );
 
-      if (user != null && mounted) {
+      if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
         );
-      } else if (mounted) {
-        _showError('Đăng ký thất bại. Vui lòng thử lại.');
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) _showError(_getErrorMessage(e.code));

@@ -295,7 +295,6 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
           
           // Thông tin chi nhánh + sản phẩm
           ...itemsByBranch.entries.map((entry) {
-            final branchId = entry.key;
             final items = entry.value;
             final branchName = items.first.branchName;
             
