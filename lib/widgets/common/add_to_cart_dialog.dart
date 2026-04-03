@@ -11,6 +11,9 @@ class AddToCartDialog extends StatelessWidget {
   final double depositPrice;
   final String selectedSize; 
   final String selectedColor;
+  final String branchId;
+  final String branchName;
+  final String branchAddress;
 
   const AddToCartDialog({
     Key? key,
@@ -21,6 +24,9 @@ class AddToCartDialog extends StatelessWidget {
     required this.depositPrice,
     required this.selectedSize,
     required this.selectedColor,
+    required this.branchId,
+    required this.branchName,
+    required this.branchAddress,
   }) : super(key: key);
 
   @override
@@ -57,26 +63,41 @@ class AddToCartDialog extends StatelessWidget {
           child: const Text('Hủy'),
         ),
         ElevatedButton(
-          onPressed: () {
-            // 1. Tạo CartItem mới
-            final newItem = CartItemModel(
-              productId: productId,
-              productName: productName,
-              imageUrl: imageUrl,
-              selectedSize: selectedSize,
-              selectedColor: selectedColor,
-              rentalPricePerDay: rentalPrice,
-              depositPrice: depositPrice,
-            );
+          onPressed: () async {
+            try {
+              // 1. Tạo CartItem mới
+              final newItem = CartItemModel(
+                productId: productId,
+                productName: productName,
+                imageUrl: imageUrl,
+                selectedSize: selectedSize,
+                selectedColor: selectedColor,
+                rentalPricePerDay: rentalPrice,
+                depositPrice: depositPrice,
+                branchId: branchId,
+                branchName: branchName,
+                branchAddress: branchAddress,
+              );
 
-            // 2. Gọi hàm lưu vào giỏ
-            context.read<CartProvider>().addToCart(newItem);
+              // 2. Gọi hàm lưu vào giỏ
+              await context.read<CartProvider>().addToCart(newItem);
 
-            // 3. Đóng dialog và báo thành công
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
-            );
+              // 3. Đóng dialog và báo thành công
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
+              );
+            } catch (e) {
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceFirst('Exception: ', '')),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           },
           child: const Text('Đồng ý'),
         ),

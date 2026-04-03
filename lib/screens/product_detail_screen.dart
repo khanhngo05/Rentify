@@ -507,6 +507,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               depositPrice: product.depositAmount.toDouble(),
                               selectedSize: _selectedSize,
                               selectedColor: _selectedColor,
+                              branchId: _selectedBranch!.id,
+                              branchName: _selectedBranch!.name,
+                              branchAddress: _selectedBranch!.address,
                             ),
                           );
                         }
@@ -536,6 +539,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 product: product,
                                 selectedSize: _selectedSize,
                                 selectedColor: _selectedColor,
+                                branchId: _selectedBranch!.id,
+                                branchName: _selectedBranch!.name,
+                                branchAddress: _selectedBranch!.address,
                               ),
                             ),
                           );

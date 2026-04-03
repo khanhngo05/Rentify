@@ -83,6 +83,11 @@ class _AuthGateState extends State<AuthGate> {
           return const LoginScreen();
         }
 
+        // Load giỏ hàng khi user đăng nhập
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          context.read<CartProvider>().loadCart();
+        });
+
         // Kiểm tra role của user để phân luồng
         return FutureBuilder<UserModel?>(
           future: _firebaseService.getUserById(user.uid),

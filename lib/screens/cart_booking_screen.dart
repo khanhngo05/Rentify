@@ -2,36 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
-import '../models/product_model.dart';
+import '../providers/cart_provider.dart';
 import '../models/order_model.dart';
 import '../services/firebase_service.dart';
 
-class RentalBookingScreen extends StatefulWidget {
-  const RentalBookingScreen({
+class CartBookingScreen extends StatefulWidget {
+  const CartBookingScreen({
     super.key,
-    required this.product,
-    required this.selectedSize,
-    required this.selectedColor,
     required this.branchId,
     required this.branchName,
     required this.branchAddress,
   });
 
-  final Product product;
-  final String selectedSize;
-  final String selectedColor;
   final String branchId;
   final String branchName;
   final String branchAddress;
 
   @override
-  State<RentalBookingScreen> createState() => _RentalBookingScreenState();
+  State<CartBookingScreen> createState() => _CartBookingScreenState();
 }
 
-class _RentalBookingScreenState extends State<RentalBookingScreen> {
+class _CartBookingScreenState extends State<CartBookingScreen> {
   late DateTimeRange _rentalRange;
   String? _receiverName;
   String? _receiverPhone;
@@ -154,24 +149,34 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       return;
     }
 
+    final cartProvider = context.read<CartProvider>();
+    if (cartProvider.cartItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Giỏ hàng trống!')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
-      final rentalFee = widget.product.rentalPricePerDay * _rentalDays;
+      final rentalFee = cartProvider.totalRentalPrice * _rentalDays;
       final now = DateTime.now();
 
-      // Tạo OrderItem từ sản phẩm
-      final orderItem = OrderItem(
-        productId: widget.product.id,
-        productName: widget.product.name,
-        thumbnailUrl: widget.product.thumbnailUrl,
-        selectedSize: widget.selectedSize,
-        selectedColor: widget.selectedColor,
-        rentalPricePerDay: widget.product.rentalPricePerDay,
-        depositAmount: widget.product.depositAmount,
-        quantity: 1,
-        subtotal: widget.product.rentalPricePerDay,
-      );
+      // Chuyển đổi CartItems sang OrderItems
+      final orderItems = cartProvider.cartItems.map((cartItem) {
+        return OrderItem(
+          productId: cartItem.productId,
+          productName: cartItem.productName,
+          thumbnailUrl: cartItem.imageUrl,
+          selectedSize: cartItem.selectedSize,
+          selectedColor: cartItem.selectedColor,
+          rentalPricePerDay: cartItem.rentalPricePerDay,
+          depositAmount: cartItem.depositPrice,
+          quantity: cartItem.quantity,
+          subtotal: cartItem.rentalPricePerDay * cartItem.quantity,
+        );
+      }).toList();
 
       // Tạo OrderModel
       final order = OrderModel(
@@ -180,12 +185,12 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
         branchId: widget.branchId,
         branchName: widget.branchName,
         branchAddress: widget.branchAddress,
-        items: [orderItem],
+        items: orderItems,
         rentalStartDate: _rentalRange.start,
         rentalEndDate: _rentalRange.end,
         rentalDays: _rentalDays,
         totalRentalFee: rentalFee,
-        depositPaid: widget.product.depositAmount,
+        depositPaid: cartProvider.totalDepositPrice,
         status: 'pending',
         deliveryAddress: _receiverAddress!,
         note: 'Người nhận: $_receiverName - SĐT: $_receiverPhone',
@@ -198,6 +203,9 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
       final orderId = await firebaseService.createOrder(order);
 
       if (!mounted) return;
+
+      // Xóa giỏ hàng sau khi đặt thành công
+      cartProvider.clearCart();
 
       // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,11 +232,23 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rentalFee = widget.product.rentalPricePerDay * _rentalDays;
-    final total = rentalFee + widget.product.depositAmount;
+    final cartProvider = context.watch<CartProvider>();
+    final cartItems = cartProvider.cartItems;
+
+    if (cartItems.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Thuê từ giỏ hàng')),
+        body: const Center(
+          child: Text('Giỏ hàng trống!'),
+        ),
+      );
+    }
+
+    final rentalFee = cartProvider.totalRentalPrice * _rentalDays;
+    final total = rentalFee + cartProvider.totalDepositPrice;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thuê ngay')),
+      appBar: AppBar(title: const Text('Thuê từ giỏ hàng')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
         children: [
@@ -293,62 +313,66 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Sản phẩm thuê',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                Text(
+                  'Sản phẩm thuê (${cartItems.length} món)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        widget.product.thumbnailUrl,
-                        width: 84,
-                        height: 84,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 84,
-                          height: 84,
-                          color: AppColors.shimmerBase,
-                          child: const Icon(Icons.image_not_supported_rounded),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                ...cartItems.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.product.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              item.imageUrl,
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 64,
+                                height: 64,
+                                color: AppColors.shimmerBase,
+                                child: const Icon(Icons.image_not_supported_rounded),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Size: ${widget.selectedSize.isEmpty ? 'Chưa chọn' : widget.selectedSize}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Màu: ${widget.selectedColor.isEmpty ? 'Chưa chọn' : widget.selectedColor}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.productName,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Size: ${item.selectedSize} | Màu: ${item.selectedColor}',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'SL: ${item.quantity} | ${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
+                    )),
               ],
             ),
           ),
@@ -394,9 +418,8 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
             child: Column(
               children: [
                 _PriceRow(
-                  label: 'Giá thuê',
-                  value:
-                      '${AppConstants.formatPrice(widget.product.rentalPricePerDay)}/ngày',
+                  label: 'Tạm tính thuê (1 ngày)',
+                  value: AppConstants.formatPrice(cartProvider.totalRentalPrice),
                 ),
                 _PriceRow(
                   label: 'Phí thuê ($_rentalDays ngày)',
@@ -404,7 +427,7 @@ class _RentalBookingScreenState extends State<RentalBookingScreen> {
                 ),
                 _PriceRow(
                   label: 'Tiền đặt cọc',
-                  value: AppConstants.formatPrice(widget.product.depositAmount),
+                  value: AppConstants.formatPrice(cartProvider.totalDepositPrice),
                 ),
                 const Divider(height: 20),
                 _PriceRow(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
-import 'rental_booking_screen.dart'; // Import màn hình đặt thuê ở Bước 5
+import 'cart_booking_screen.dart'; // Màn hình đặt thuê cho giỏ hàng
 
 class CartScreen extends StatelessWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -129,10 +129,24 @@ class CartScreen extends StatelessWidget {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () {
-                          // Điều hướng sang trang Đặt thuê
+                          // Kiểm tra nếu giỏ có sản phẩm
+                          if (cartProvider.cartItems.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Giỏ hàng trống!')),
+                            );
+                            return;
+                          }
+                          
+                          // Điều hướng sang trang Đặt thuê cho giỏ hàng
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const RentalBookingScreen()),
+                            MaterialPageRoute(
+                              builder: (context) => CartBookingScreen(
+                                branchId: cartProvider.branchId!,
+                                branchName: cartProvider.branchName!,
+                                branchAddress: cartProvider.branchAddress!,
+                              ),
+                            ),
                           );
                         },
                         child: const Text('Xác nhận đặt thuê', style: TextStyle(fontSize: 16)),
