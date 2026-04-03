@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../constants/app_constants.dart';
 import '../../models/cart_item_model.dart';
 import '../../providers/cart_provider.dart';
 
@@ -11,6 +12,10 @@ class AddToCartDialog extends StatelessWidget {
   final double depositPrice;
   final String selectedSize; 
   final String selectedColor;
+  final String branchId;
+  final String branchName;
+  final String branchAddress;
+  final int availableStock; // Thêm tồn kho
 
   const AddToCartDialog({
     Key? key,
@@ -21,6 +26,10 @@ class AddToCartDialog extends StatelessWidget {
     required this.depositPrice,
     required this.selectedSize,
     required this.selectedColor,
+    required this.branchId,
+    required this.branchName,
+    required this.branchAddress,
+    required this.availableStock,
   }) : super(key: key);
 
   @override
@@ -47,8 +56,8 @@ class AddToCartDialog extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text('Size: $selectedSize | Màu: $selectedColor'),
-          Text('Giá thuê: $rentalPrice đ/ngày'),
-          Text('Cọc: $depositPrice đ'),
+          Text('Giá thuê: ${AppConstants.formatPrice(rentalPrice)}/ngày'),
+          Text('Cọc: ${AppConstants.formatPrice(depositPrice)}'),
         ],
       ),
       actions: [
@@ -57,26 +66,51 @@ class AddToCartDialog extends StatelessWidget {
           child: const Text('Hủy'),
         ),
         ElevatedButton(
-          onPressed: () {
-            // 1. Tạo CartItem mới
-            final newItem = CartItemModel(
-              productId: productId,
-              productName: productName,
-              imageUrl: imageUrl,
-              selectedSize: selectedSize,
-              selectedColor: selectedColor,
-              rentalPricePerDay: rentalPrice,
-              depositPrice: depositPrice,
-            );
+          onPressed: () async {
+            try {
+              // 1. Tạo CartItem mới
+              final newItem = CartItemModel(
+                productId: productId,
+                productName: productName,
+                imageUrl: imageUrl,
+                selectedSize: selectedSize,
+                selectedColor: selectedColor,
+                rentalPricePerDay: rentalPrice,
+                depositPrice: depositPrice,
+                branchId: branchId,
+                branchName: branchName,
+                branchAddress: branchAddress,
+                availableStock: availableStock,
+              );
 
-            // 2. Gọi hàm lưu vào giỏ
-            context.read<CartProvider>().addToCart(newItem);
+              // 2. Gọi hàm lưu vào giỏ
+              final added = await context.read<CartProvider>().addToCart(newItem);
 
-            // 3. Đóng dialog và báo thành công
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
-            );
+              // 3. Đóng dialog và báo thành công
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              if (added) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã thêm vào giỏ hàng thành công!')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã đạt số lượng tồn kho tối đa!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceFirst('Exception: ', '')),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           },
           child: const Text('Đồng ý'),
         ),

@@ -6,6 +6,10 @@ class CartItemModel {
   final String selectedColor;
   final double rentalPricePerDay;
   final double depositPrice;
+  final String branchId;
+  final String branchName;
+  final String branchAddress;
+  final int availableStock; // Số lượng tồn kho tại chi nhánh
   int quantity;
   int rentalDays; // Số ngày thuê mặc định
 
@@ -17,6 +21,10 @@ class CartItemModel {
     required this.selectedColor,
     required this.rentalPricePerDay,
     required this.depositPrice,
+    required this.branchId,
+    required this.branchName,
+    required this.branchAddress,
+    this.availableStock = 999, // Mặc định nếu không có
     this.quantity = 1,
     this.rentalDays = 1,
   });
@@ -26,4 +34,42 @@ class CartItemModel {
   
   // Tự động tính tiền cọc cho item này
   double get totalItemDeposit => depositPrice * quantity;
+
+  // Convert to Map để lưu vào Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'productId': productId,
+      'productName': productName,
+      'imageUrl': imageUrl,
+      'selectedSize': selectedSize,
+      'selectedColor': selectedColor,
+      'rentalPricePerDay': rentalPricePerDay,
+      'depositPrice': depositPrice,
+      'branchId': branchId,
+      'branchName': branchName,
+      'branchAddress': branchAddress,
+      'availableStock': availableStock,
+      'quantity': quantity,
+      'rentalDays': rentalDays,
+    };
+  }
+
+  // Convert từ Map (Firestore) sang CartItemModel
+  factory CartItemModel.fromMap(Map<String, dynamic> map) {
+    return CartItemModel(
+      productId: map['productId'] ?? '',
+      productName: map['productName'] ?? '',
+      imageUrl: map['imageUrl'] ?? '',
+      selectedSize: map['selectedSize'] ?? '',
+      selectedColor: map['selectedColor'] ?? '',
+      rentalPricePerDay: (map['rentalPricePerDay'] ?? 0).toDouble(),
+      depositPrice: (map['depositPrice'] ?? 0).toDouble(),
+      branchId: map['branchId'] ?? '',
+      branchName: map['branchName'] ?? '',
+      branchAddress: map['branchAddress'] ?? '',
+      availableStock: (map['availableStock'] ?? 999).toInt(),
+      quantity: (map['quantity'] ?? 1).toInt(),
+      rentalDays: (map['rentalDays'] ?? 1).toInt(),
+    );
+  }
 }
