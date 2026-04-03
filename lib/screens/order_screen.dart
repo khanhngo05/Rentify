@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/order_model.dart';
+import '../models/review_model.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 
@@ -49,6 +50,10 @@ class _OrderScreenState extends State<OrderScreen>
   Future<List<OrderModel>>? _ordersFuture;
   String? _uid;
 
+  final Map<String, bool> _reviewedByOrderItem = <String, bool>{};
+  final Set<String> _reviewCheckingKeys = <String>{};
+  final Set<String> _reviewSubmittingKeys = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -83,9 +88,15 @@ class _OrderScreenState extends State<OrderScreen>
   }
 
   void _syncUserAndLoad(String? uid) {
+    final shouldResetCaches = _uid != uid;
     setState(() {
       _uid = uid;
       _ordersFuture = uid == null ? null : _firebaseService.getOrdersByUser(uid);
+      if (shouldResetCaches) {
+        _reviewedByOrderItem.clear();
+        _reviewCheckingKeys.clear();
+        _reviewSubmittingKeys.clear();
+      }
     });
   }
 
@@ -97,6 +108,136 @@ class _OrderScreenState extends State<OrderScreen>
       _ordersFuture = _firebaseService.getOrdersByUser(uid);
     });
     await _ordersFuture;
+  }
+
+  String _reviewKey(String orderId, String productId) {
+    return '$orderId::$productId';
+  }
+
+  Future<String> _resolveCurrentUserName(String uid) async {
+    final authName = _authService.currentUser?.displayName?.trim() ?? '';
+    if (authName.isNotEmpty) return authName;
+
+    try {
+      final user = await _firebaseService.getUserById(uid);
+      final profileName = user?.displayName.trim() ?? '';
+      if (profileName.isNotEmpty) return profileName;
+    } catch (_) {}
+
+    return 'Người dùng';
+  }
+
+  void _ensureReviewState(OrderModel order, OrderItem item) {
+    if (order.status != 'completed') return;
+    final uid = _uid;
+    if (uid == null) return;
+
+    final key = _reviewKey(order.id, item.productId);
+    if (_reviewedByOrderItem.containsKey(key) || _reviewCheckingKeys.contains(key)) {
+      return;
+    }
+
+    setState(() {
+      _reviewCheckingKeys.add(key);
+    });
+
+    _firebaseService
+        .hasReviewForOrderItem(
+          userId: uid,
+          orderId: order.id,
+          productId: item.productId,
+        )
+        .then((hasReviewed) {
+          if (!mounted) return;
+          setState(() {
+            _reviewedByOrderItem[key] = hasReviewed;
+            _reviewCheckingKeys.remove(key);
+          });
+        })
+        .catchError((_) {
+          if (!mounted) return;
+          setState(() {
+            _reviewCheckingKeys.remove(key);
+          });
+        });
+  }
+
+  Future<void> _showReviewDialogForItem(OrderModel order, OrderItem item) async {
+    if (order.status != 'completed') return;
+    final uid = _uid;
+    if (uid == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để đánh giá.')),
+      );
+      return;
+    }
+
+    final key = _reviewKey(order.id, item.productId);
+    if (_reviewedByOrderItem[key] == true || _reviewSubmittingKeys.contains(key)) {
+      return;
+    }
+
+    final draft = await showDialog<_ReviewDraft>(
+      context: context,
+      builder: (_) => _ReviewInputDialog(productName: item.productName),
+    );
+    if (draft == null) return;
+
+    setState(() {
+      _reviewSubmittingKeys.add(key);
+    });
+
+    try {
+      final displayName = await _resolveCurrentUserName(uid);
+      final review = ReviewModel(
+        id: '',
+        productId: item.productId,
+        branchId: order.branchId,
+        userId: uid,
+        orderId: order.id,
+        rating: draft.rating,
+        comment: draft.comment?.trim().isEmpty == true
+            ? null
+            : draft.comment?.trim(),
+        userDisplayName: displayName,
+        photoUrls: const <String>[],
+        createdAt: DateTime.now(),
+      );
+
+      await _firebaseService.createReview(review);
+      if (!mounted) return;
+      setState(() {
+        _reviewedByOrderItem[key] = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã gửi đánh giá cho "${item.productName}".')),
+      );
+    } on FirebaseException catch (error) {
+      if (!mounted) return;
+      if (error.code == 'already-exists') {
+        setState(() {
+          _reviewedByOrderItem[key] = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sản phẩm này đã được đánh giá rồi.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message ?? 'Không thể gửi đánh giá.')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể gửi đánh giá lúc này.')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _reviewSubmittingKeys.remove(key);
+      });
+    }
   }
 
   Map<String, List<OrderModel>> _group(List<OrderModel> orders) {
@@ -196,12 +337,42 @@ class _OrderScreenState extends State<OrderScreen>
                 ...order.items.map(
                   (item) => ListTile(
                     contentPadding: EdgeInsets.zero,
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: item.thumbnailUrl.trim().isEmpty
+                          ? Container(
+                              width: 48,
+                              height: 48,
+                              color: AppColors.surfaceVariant,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.image_not_supported_rounded,
+                                size: 16,
+                              ),
+                            )
+                          : Image.network(
+                              item.thumbnailUrl,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 48,
+                                height: 48,
+                                color: AppColors.surfaceVariant,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.image_not_supported_rounded,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                    ),
                     title: Text(item.productName),
                     subtitle: Text(
-                      'Size: ${item.selectedSize} • Màu: ${item.selectedColor}',
+                      'Size: ${item.selectedSize} • Màu: ${item.selectedColor} • x${item.quantity}',
                     ),
                     trailing: Text(
-                      '${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày x ${item.quantity}',
+                      '${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -269,6 +440,234 @@ class _OrderScreenState extends State<OrderScreen>
     if (updated == true && mounted) {
       await _reload();
     }
+  }
+
+  Widget _buildReviewAction(OrderModel order, OrderItem item) {
+    if (order.status != 'completed') return const SizedBox.shrink();
+    final key = _reviewKey(order.id, item.productId);
+    _ensureReviewState(order, item);
+
+    if (_reviewSubmittingKeys.contains(key)) {
+      return OutlinedButton.icon(
+        onPressed: null,
+        icon: const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        label: const Text('Đang gửi...'),
+      );
+    }
+
+    if (_reviewCheckingKeys.contains(key)) {
+      return OutlinedButton.icon(
+        onPressed: null,
+        icon: const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        label: const Text('Đang kiểm tra...'),
+      );
+    }
+
+    if (_reviewedByOrderItem[key] == true) {
+      return FilledButton.tonalIcon(
+        onPressed: null,
+        icon: const Icon(Icons.check_circle_outline_rounded),
+        label: const Text('Đã đánh giá'),
+      );
+    }
+
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.primary),
+      ),
+      onPressed: () => _showReviewDialogForItem(order, item),
+      icon: const Icon(Icons.rate_review_outlined, color: AppColors.primary),
+      label: const Text('Đánh giá'),
+    );
+  }
+
+  Widget _buildProductRow(OrderModel order, OrderItem item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: item.thumbnailUrl.trim().isEmpty
+                    ? Container(
+                        width: 58,
+                        height: 58,
+                        color: AppColors.surfaceVariant,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.image_not_supported_rounded,
+                          size: 18,
+                        ),
+                      )
+                    : Image.network(
+                        item.thumbnailUrl,
+                        width: 58,
+                        height: 58,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 58,
+                          height: 58,
+                          color: AppColors.surfaceVariant,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_not_supported_rounded,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.productName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Phân loại: ${item.selectedSize} • ${item.selectedColor}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Số lượng: ${item.quantity}',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          if (order.status == 'completed') ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _buildReviewAction(order, item),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(OrderModel order) {
+    final statusColor = AppColors.getStatusColor(order.status);
+    final previewItems = order.items.take(3).toList();
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => _showOrderDetail(order),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Đơn #${_code(order.id)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      AppConstants.getStatusName(order.status),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_date(order.rentalStartDate)} - ${_date(order.rentalEndDate)} • ${order.rentalDays} ngày',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                order.branchName.trim().isEmpty ? 'Chi nhánh chưa xác định' : order.branchName,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const Divider(height: 18),
+              ...previewItems.map((item) => _buildProductRow(order, item)),
+              if (order.items.length > previewItems.length)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '+${order.items.length - previewItems.length} sản phẩm khác',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Text(
+                    'Tổng ${order.totalItemCount} sản phẩm',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Tổng thuê: ${AppConstants.formatPrice(order.totalRentalFee)}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -361,32 +760,7 @@ class _OrderScreenState extends State<OrderScreen>
                         padding: const EdgeInsets.all(16),
                         itemCount: orders.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final order = orders[index];
-                          return Card(
-                            child: ListTile(
-                              onTap: () => _showOrderDetail(order),
-                              title: Text('Đơn #${_code(order.id)}'),
-                              subtitle: Text(
-                                '${_date(order.rentalStartDate)} - ${_date(order.rentalEndDate)}',
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(AppConstants.getStatusName(order.status)),
-                                  Text(
-                                    AppConstants.formatPrice(order.totalRentalFee),
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        itemBuilder: (_, index) => _buildOrderCard(orders[index]),
                       ),
                     );
                   }).toList(),
@@ -412,7 +786,9 @@ class _OrderScreenState extends State<OrderScreen>
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
-          Expanded(child: Text(value.trim().isEmpty ? 'Chưa có thông tin' : value)),
+          Expanded(
+            child: Text(value.trim().isEmpty ? 'Chưa có thông tin' : value),
+          ),
         ],
       ),
     );
@@ -423,6 +799,101 @@ class _StatusTab {
   const _StatusTab(this.code, this.label);
   final String code;
   final String label;
+}
+
+class _ReviewDraft {
+  const _ReviewDraft({required this.rating, this.comment});
+
+  final int rating;
+  final String? comment;
+}
+
+class _ReviewInputDialog extends StatefulWidget {
+  const _ReviewInputDialog({required this.productName});
+
+  final String productName;
+
+  @override
+  State<_ReviewInputDialog> createState() => _ReviewInputDialogState();
+}
+
+class _ReviewInputDialogState extends State<_ReviewInputDialog> {
+  int _rating = 5;
+  final TextEditingController _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(
+      _ReviewDraft(rating: _rating, comment: _commentController.text),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đánh giá sản phẩm'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.productName,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            const Text('Mức độ hài lòng'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              children: List.generate(5, (index) {
+                final star = index + 1;
+                return IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _rating = star;
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    star <= _rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: AppColors.star,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _commentController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Nhận xét (không bắt buộc)',
+                alignLabelWithHint: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _submit,
+          child: const Text('Gửi đánh giá'),
+        ),
+      ],
+    );
+  }
 }
 
 String _date(DateTime value) {

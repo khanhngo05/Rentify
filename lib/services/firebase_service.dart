@@ -388,6 +388,22 @@ class FirebaseService {
     }
   }
 
+  /// Kiểm tra user đã đánh giá 1 sản phẩm trong 1 đơn cụ thể chưa.
+  Future<bool> hasReviewForOrderItem({
+    required String userId,
+    required String orderId,
+    required String productId,
+  }) async {
+    final snapshot = await _db
+        .collection(AppConstants.reviewsCollection)
+        .where('userId', isEqualTo: userId)
+        .where('orderId', isEqualTo: orderId)
+        .where('productId', isEqualTo: productId)
+        .limit(1)
+        .get();
+    return snapshot.docs.isNotEmpty;
+  }
+
   /// Tạo đánh giá mới + cập nhật rating trung bình của sản phẩm
   Future<String> createReview(ReviewModel review) async {
     if (review.orderId.trim().isEmpty) {

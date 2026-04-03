@@ -41,6 +41,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
   bool _favoriteLoading = false;
   bool _isLoadingReviews = false;
+  final Map<String, String> _reviewerNames = <String, String>{};
   bool _isSubmittingReview = false;
   bool _isCheckingReviewEligibility = false;
   List<ReviewModel> _reviews = <ReviewModel>[];
@@ -66,7 +67,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadBranches();
     _loadFavoriteStatus();
     _loadReviews();
-    _loadReviewEligibility();
   }
 
   @override
@@ -213,6 +213,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     try {
       final reviews = await _firebaseService.getReviewsByProduct(widget.product.id);
+      final reviewerNames = await _resolveReviewerNames(reviews);
       if (!mounted) return;
 
       double average = 0;
@@ -223,6 +224,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       setState(() {
         _reviews = reviews;
+        _reviewerNames
+          ..clear()
+          ..addAll(reviewerNames);
         _reviewCount = reviews.length;
         _averageRating = reviews.isEmpty
             ? widget.product.rating
@@ -237,6 +241,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _isLoadingReviews = false;
       });
     }
+  }
+
+  Future<Map<String, String>> _resolveReviewerNames(
+    List<ReviewModel> reviews,
+  ) async {
+    final names = <String, String>{};
+
+    for (final review in reviews) {
+      final directName = (review.userDisplayName ?? '').trim();
+      if (directName.isNotEmpty) {
+        names[review.userId] = directName;
+      }
+    }
+
+    final missingUserIds = reviews
+        .map((review) => review.userId.trim())
+        .where((id) => id.isNotEmpty && !names.containsKey(id))
+        .toSet();
+    if (missingUserIds.isEmpty) return names;
+
+    await Future.wait(
+      missingUserIds.map((userId) async {
+        try {
+          final user = await _firebaseService.getUserById(userId);
+          final displayName = user?.displayName.trim() ?? '';
+          if (displayName.isNotEmpty) {
+            names[userId] = displayName;
+          }
+        } catch (_) {}
+      }),
+    );
+
+    return names;
   }
 
   Future<void> _loadReviewEligibility() async {
@@ -314,6 +351,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _showReviewDialog() async {
     if (_isSubmittingReview || _isCheckingReviewEligibility) return;
 
@@ -380,6 +418,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   String _reviewUserLabel(String userId) {
+    final fullName = _reviewerNames[userId.trim()]?.trim() ?? '';
+    if (fullName.isNotEmpty) return fullName;
+
     final trimmed = userId.trim();
     if (trimmed.isEmpty) return 'Người dùng';
     if (trimmed.length <= 6) return trimmed;
@@ -391,17 +432,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final product = widget.product;
     final canRent =
         _selectedBranch != null && !_isOutOfStock(_selectedBranch!.id);
-    final canSubmitReview = _eligibleReviewOrder != null;
-    final reviewButtonEnabled =
-        canSubmitReview && !_isSubmittingReview && !_isCheckingReviewEligibility;
-    // ignore: unused_local_variable
-    final reviewButtonLabel = _isSubmittingReview
-        ? 'Đang gửi đánh giá...'
-        : _isCheckingReviewEligibility
-            ? 'Đang kiểm tra điều kiện...'
-            : canSubmitReview
-                ? 'Đánh giá sản phẩm'
-                : 'Chưa đủ điều kiện đánh giá';
 
     return Scaffold(
       appBar: AppBar(
@@ -685,42 +715,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
+                Container(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primary),
-                    ),
-                    onPressed: reviewButtonEnabled ? _showReviewDialog : null,
-                    icon: (_isSubmittingReview || _isCheckingReviewEligibility)
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.rate_review_outlined),
-                    label: Text(
-                      _isSubmittingReview
-                          ? 'Đang gửi đánh giá...'
-                          : 'Đánh giá sản phẩm',
-                    ),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Đánh giá sản phẩm tại mục Đơn hàng, trong đơn Hoàn thành.',
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
-                const SizedBox(height: 10),
-                if (!canSubmitReview &&
-                    !_isCheckingReviewEligibility &&
-                    _reviewBlockedMessage.trim().isNotEmpty)
-                  Text(
-                    _reviewBlockedMessage,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                if (!canSubmitReview &&
-                    !_isCheckingReviewEligibility &&
-                    _reviewBlockedMessage.trim().isNotEmpty)
-                  const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 if (_isLoadingReviews)
                   const LinearProgressIndicator(minHeight: 3)
                 else if (_reviews.isEmpty)
