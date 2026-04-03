@@ -7,8 +7,8 @@ import '../services/firebase_service.dart';
 import '../viewmodels/home_view_model.dart';
 import '../widgets/common/product_card.dart';
 import 'branch_screen.dart';
-import 'history_screen.dart'; // Trả lại file của Bảo
-import 'cart_screen.dart'; 
+import 'order_screen.dart';
+import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 import 'home/widgets/category_chips.dart';
 import 'home/widgets/home_app_bar.dart';
@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HomeViewModel _viewModel;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  int _lastTabIndex = 0;
+  int _orderRefreshSignal = 0;
 
   @override
   void initState() {
@@ -49,6 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onModelChanged() {
     if (!mounted) return;
+    final currentTab = _viewModel.selectedTabIndex;
+    if (_lastTabIndex != currentTab && currentTab == 2) {
+      _orderRefreshSignal++;
+    }
+    _lastTabIndex = currentTab;
     setState(() {});
   }
 
@@ -66,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = <Widget>[
       _buildHomeTab(context),
       const BranchScreen(),
-      const HistoryScreen(), // Đã trả lại HistoryScreen của Bảo
+      OrderScreen(refreshSignal: _orderRefreshSignal),
       const ProfileScreen(),
     ];
 
@@ -93,10 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: 'Chi nhánh',
               ),
               BottomNavigationBarItem(
-                // Đổi icon thành icon đơn hàng và label thành Đơn hàng
                 icon: _buildNavIcon(Icons.receipt_long_outlined, false),
                 activeIcon: _buildNavIcon(Icons.receipt_long_rounded, true),
-                label: 'Đơn hàng', 
+                label: 'Đơn hàng',
               ),
               BottomNavigationBarItem(
                 icon: _buildNavIcon(Icons.person_outline, false),

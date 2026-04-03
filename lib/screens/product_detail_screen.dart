@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
 import '../models/branch_model.dart';
 import '../models/favorite_model.dart';
+import '../models/order_model.dart';
 import '../models/product_model.dart';
+import '../models/review_model.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import 'rental_booking_screen.dart';
@@ -37,6 +40,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool _isFavorite = false;
   bool _favoriteLoading = false;
+  bool _isLoadingReviews = false;
+  final Map<String, String> _reviewerNames = <String, String>{};
+  bool _isSubmittingReview = false;
+  bool _isCheckingReviewEligibility = false;
+  List<ReviewModel> _reviews = <ReviewModel>[];
+  double _averageRating = 0;
+  int _reviewCount = 0;
+  OrderModel? _eligibleReviewOrder;
+  String _reviewBlockedMessage =
+      'Bạn chỉ có thể đánh giá sau khi đơn thuê hoàn thành.';
 
   @override
   void initState() {
@@ -49,8 +62,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _selectedColor = widget.product.colors.isNotEmpty
         ? widget.product.colors.first
         : '';
+    _averageRating = widget.product.rating;
+    _reviewCount = widget.product.reviewCount;
     _loadBranches();
     _loadFavoriteStatus();
+    _loadReviews();
   }
 
   @override
@@ -188,6 +204,227 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _loadReviews() async {
+    setState(() {
+      _isLoadingReviews = true;
+    });
+
+    try {
+      final reviews = await _firebaseService.getReviewsByProduct(widget.product.id);
+      final reviewerNames = await _resolveReviewerNames(reviews);
+      if (!mounted) return;
+
+      double average = 0;
+      if (reviews.isNotEmpty) {
+        final total = reviews.fold<int>(0, (sum, item) => sum + item.rating);
+        average = total / reviews.length;
+      }
+
+      setState(() {
+        _reviews = reviews;
+        _reviewerNames
+          ..clear()
+          ..addAll(reviewerNames);
+        _reviewCount = reviews.length;
+        _averageRating = reviews.isEmpty
+            ? widget.product.rating
+            : double.parse(average.toStringAsFixed(1));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không thể tải đánh giá sản phẩm');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingReviews = false;
+      });
+    }
+  }
+
+  Future<Map<String, String>> _resolveReviewerNames(
+    List<ReviewModel> reviews,
+  ) async {
+    final names = <String, String>{};
+
+    for (final review in reviews) {
+      final directName = (review.userDisplayName ?? '').trim();
+      if (directName.isNotEmpty) {
+        names[review.userId] = directName;
+      }
+    }
+
+    final missingUserIds = reviews
+        .map((review) => review.userId.trim())
+        .where((id) => id.isNotEmpty && !names.containsKey(id))
+        .toSet();
+    if (missingUserIds.isEmpty) return names;
+
+    await Future.wait(
+      missingUserIds.map((userId) async {
+        try {
+          final user = await _firebaseService.getUserById(userId);
+          final displayName = user?.displayName.trim() ?? '';
+          if (displayName.isNotEmpty) {
+            names[userId] = displayName;
+          }
+        } catch (_) {}
+      }),
+    );
+
+    return names;
+  }
+
+  Future<void> _loadReviewEligibility() async {
+    final user = _authService.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _eligibleReviewOrder = null;
+        _reviewBlockedMessage =
+            'Vui lòng đăng nhập để đánh giá sản phẩm đã thuê.';
+        _isCheckingReviewEligibility = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingReviewEligibility = true;
+    });
+
+    try {
+      final completedOrders = await _firebaseService.getCompletedOrdersByUser(
+        user.uid,
+      );
+      final userReviews = await _firebaseService.getReviewsByUserAndProduct(
+        user.uid,
+        widget.product.id,
+      );
+      if (!mounted) return;
+
+      final reviewedOrderIds = userReviews
+          .map((review) => review.orderId.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final ordersWithProduct = completedOrders.where((order) {
+        return order.items.any(
+          (item) => item.productId.trim() == widget.product.id,
+        );
+      }).toList();
+
+      OrderModel? eligibleOrder;
+      for (final order in ordersWithProduct) {
+        if (!reviewedOrderIds.contains(order.id)) {
+          eligibleOrder = order;
+          break;
+        }
+      }
+
+      String blockedMessage;
+      if (eligibleOrder != null) {
+        blockedMessage = '';
+      } else if (ordersWithProduct.isEmpty) {
+        blockedMessage =
+            'Bạn chỉ có thể đánh giá sau khi đơn thuê sản phẩm này hoàn thành.';
+      } else {
+        blockedMessage = 'Bạn đã đánh giá hết các đơn hoàn thành của sản phẩm này.';
+      }
+
+      setState(() {
+        _eligibleReviewOrder = eligibleOrder;
+        _reviewBlockedMessage = blockedMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _eligibleReviewOrder = null;
+        _reviewBlockedMessage =
+            'Không thể kiểm tra điều kiện đánh giá lúc này.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingReviewEligibility = false;
+      });
+    }
+  }
+
+  // ignore: unused_element
+  Future<void> _showReviewDialog() async {
+    if (_isSubmittingReview || _isCheckingReviewEligibility) return;
+
+    final user = _authService.currentUser;
+    if (user == null) {
+      _showMessage('Vui lòng đăng nhập để đánh giá sản phẩm');
+      return;
+    }
+
+    final eligibleOrder = _eligibleReviewOrder;
+    if (eligibleOrder == null) {
+      _showMessage(
+        _reviewBlockedMessage.isEmpty
+            ? 'Bạn chưa đủ điều kiện để đánh giá sản phẩm này.'
+            : _reviewBlockedMessage,
+      );
+      return;
+    }
+
+    final draft = await showDialog<_ReviewDraft>(
+      context: context,
+      builder: (_) => const _ReviewInputDialog(),
+    );
+
+    if (draft == null) return;
+
+    setState(() {
+      _isSubmittingReview = true;
+    });
+
+    try {
+      final review = ReviewModel(
+        id: '',
+        productId: widget.product.id,
+        branchId: eligibleOrder.branchId,
+        userId: user.uid,
+        orderId: eligibleOrder.id,
+        rating: draft.rating,
+        comment: draft.comment?.trim().isEmpty == true
+            ? null
+            : draft.comment?.trim(),
+        photoUrls: const <String>[],
+        createdAt: DateTime.now(),
+      );
+
+      await _firebaseService.createReview(review);
+      if (!mounted) return;
+      await _loadReviews();
+      await _loadReviewEligibility();
+      _showMessage('Đã gửi đánh giá thành công');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Không thể gửi đánh giá lúc này');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSubmittingReview = false;
+      });
+    }
+  }
+
+  String _formatReviewDate(DateTime value) {
+    return DateFormat(AppConstants.dateTimeFormat).format(value);
+  }
+
+  String _reviewUserLabel(String userId) {
+    final fullName = _reviewerNames[userId.trim()]?.trim() ?? '';
+    if (fullName.isNotEmpty) return fullName;
+
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return 'Người dùng';
+    if (trimmed.length <= 6) return trimmed;
+    return 'User ${trimmed.substring(0, 6)}';
   }
 
   @override
@@ -467,16 +704,92 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const Icon(Icons.star_rounded, color: AppColors.star),
                     const SizedBox(width: 6),
                     Text(
-                      product.rating.toStringAsFixed(1),
+                      _averageRating.toStringAsFixed(1),
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '(${product.reviewCount} review)',
+                      '($_reviewCount đánh giá)',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Đánh giá sản phẩm tại mục Đơn hàng, trong đơn Hoàn thành.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_isLoadingReviews)
+                  const LinearProgressIndicator(minHeight: 3)
+                else if (_reviews.isEmpty)
+                  const Text(
+                    'Chưa có đánh giá nào cho sản phẩm này.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  )
+                else
+                  Column(
+                    children: _reviews.take(5).map((review) {
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  _reviewUserLabel(review.userId),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _formatReviewDate(review.createdAt),
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 2,
+                              children: List.generate(5, (index) {
+                                return Icon(
+                                  index < review.rating
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  size: 16,
+                                  color: AppColors.star,
+                                );
+                              }),
+                            ),
+                            if ((review.comment ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(review.comment!.trim()),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
               ],
             ),
           ),
@@ -507,10 +820,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               depositPrice: product.depositAmount.toDouble(),
                               selectedSize: _selectedSize,
                               selectedColor: _selectedColor,
-                              branchId: _selectedBranch!.id,
-                              branchName: _selectedBranch!.name,
-                              branchAddress: _selectedBranch!.address,
-                              availableStock: _availableStockForBranch(_selectedBranch!.id),
                             ),
                           );
                         }
@@ -540,9 +849,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 product: product,
                                 selectedSize: _selectedSize,
                                 selectedColor: _selectedColor,
-                                branchId: _selectedBranch!.id,
-                                branchName: _selectedBranch!.name,
-                                branchAddress: _selectedBranch!.address,
+                                selectedBranchId: _selectedBranch?.id,
                               ),
                             ),
                           );
@@ -558,6 +865,97 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ReviewDraft {
+  const _ReviewDraft({required this.rating, this.comment});
+
+  final int rating;
+  final String? comment;
+}
+
+class _ReviewInputDialog extends StatefulWidget {
+  const _ReviewInputDialog();
+
+  @override
+  State<_ReviewInputDialog> createState() => _ReviewInputDialogState();
+}
+
+class _ReviewInputDialogState extends State<_ReviewInputDialog> {
+  int _rating = 5;
+  final TextEditingController _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(
+      _ReviewDraft(
+        rating: _rating,
+        comment: _commentController.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Đánh giá sản phẩm'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Mức độ hài lòng'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              children: List.generate(5, (index) {
+                final star = index + 1;
+                return IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _rating = star;
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    star <= _rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: AppColors.star,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _commentController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Nhận xét (không bắt buộc)',
+                alignLabelWithHint: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _submit,
+          child: const Text('Gửi'),
+        ),
+      ],
     );
   }
 }

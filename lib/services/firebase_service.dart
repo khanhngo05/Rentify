@@ -214,15 +214,64 @@ class FirebaseService {
 
   /// Lấy lịch sử đơn thuê của 1 user
   Future<List<OrderModel>> getOrdersByUser(String userId) async {
-    final snapshot = await _db
-        .collection(AppConstants.ordersCollection)
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    return snapshot.docs
-        .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
-        .toList();
+      return snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi chua tao index cho userId + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      final orders = snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
+    }
+  }
+
+  /// Lấy các đơn đã hoàn thành của 1 user.
+  Future<List<OrderModel>> getCompletedOrdersByUser(String userId) async {
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'completed')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi thiếu index cho userId + status + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.ordersCollection)
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      final orders = snapshot.docs
+          .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return orders;
+    }
   }
 
   /// Lấy 1 đơn thuê theo ID
@@ -276,19 +325,138 @@ class FirebaseService {
 
   /// Lấy đánh giá theo sản phẩm
   Future<List<ReviewModel>> getReviewsByProduct(String productId) async {
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.reviewsCollection)
+          .where('productId', isEqualTo: productId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi chưa tạo index cho productId + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.reviewsCollection)
+          .where('productId', isEqualTo: productId)
+          .get();
+
+      final reviews = snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return reviews;
+    }
+  }
+
+  /// Lấy đánh giá của 1 user cho 1 sản phẩm.
+  Future<List<ReviewModel>> getReviewsByUserAndProduct(
+    String userId,
+    String productId,
+  ) async {
+    try {
+      final snapshot = await _db
+          .collection(AppConstants.reviewsCollection)
+          .where('userId', isEqualTo: userId)
+          .where('productId', isEqualTo: productId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+    } on FirebaseException catch (e) {
+      // Fallback khi thiếu index cho userId + productId + createdAt.
+      if (e.code != 'failed-precondition') rethrow;
+
+      final snapshot = await _db
+          .collection(AppConstants.reviewsCollection)
+          .where('userId', isEqualTo: userId)
+          .where('productId', isEqualTo: productId)
+          .get();
+
+      final reviews = snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      reviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return reviews;
+    }
+  }
+
+  /// Kiểm tra user đã đánh giá 1 sản phẩm trong 1 đơn cụ thể chưa.
+  Future<bool> hasReviewForOrderItem({
+    required String userId,
+    required String orderId,
+    required String productId,
+  }) async {
     final snapshot = await _db
         .collection(AppConstants.reviewsCollection)
+        .where('userId', isEqualTo: userId)
+        .where('orderId', isEqualTo: orderId)
         .where('productId', isEqualTo: productId)
-        .orderBy('createdAt', descending: true)
+        .limit(1)
         .get();
-
-    return snapshot.docs
-        .map((doc) => ReviewModel.fromFirestore(doc.data(), doc.id))
-        .toList();
+    return snapshot.docs.isNotEmpty;
   }
 
   /// Tạo đánh giá mới + cập nhật rating trung bình của sản phẩm
   Future<String> createReview(ReviewModel review) async {
+    if (review.orderId.trim().isEmpty) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'invalid-argument',
+        message: 'Thiếu orderId cho đánh giá.',
+      );
+    }
+
+    final orderDoc = await _db
+        .collection(AppConstants.ordersCollection)
+        .doc(review.orderId)
+        .get();
+    if (!orderDoc.exists) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'not-found',
+        message: 'Không tìm thấy đơn hàng để đánh giá.',
+      );
+    }
+
+    final order = OrderModel.fromFirestore(orderDoc.data()!, orderDoc.id);
+    final hasProduct = order.items.any(
+      (item) => item.productId.trim() == review.productId,
+    );
+    if (order.userId != review.userId ||
+        order.status != 'completed' ||
+        !hasProduct) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+        message: 'Bạn chỉ có thể đánh giá sản phẩm trong đơn đã hoàn thành.',
+      );
+    }
+
+    final existingByOrder = await _db
+        .collection(AppConstants.reviewsCollection)
+        .where('orderId', isEqualTo: review.orderId)
+        .get();
+    final duplicated = existingByOrder.docs.any((doc) {
+      final data = doc.data();
+      return (data['userId'] ?? '').toString() == review.userId &&
+          (data['productId'] ?? '').toString() == review.productId;
+    });
+    if (duplicated) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'already-exists',
+        message: 'Đơn này đã được đánh giá cho sản phẩm này.',
+      );
+    }
+
     final docRef = await _db
         .collection(AppConstants.reviewsCollection)
         .add(review.toMap());

@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../viewmodels/history_view_model.dart';
+import 'order_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
-  final HistoryViewModel _viewModel = const HistoryViewModel();
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(_viewModel.title)),
-      body: Center(child: Text(_viewModel.emptyMessage)),
+    return const OrderScreen(
+      initialStatusCode: 'completed',
+      appBarTitle: 'Lịch sử thuê',
+      loginRequiredMessage: 'Bạn cần đăng nhập để xem lịch sử thuê.',
+      emptyMessage: 'Bạn chưa có lịch sử thuê nào',
     );
   }
 }

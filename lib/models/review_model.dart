@@ -9,6 +9,7 @@ class ReviewModel {
   final String orderId;
   final int rating;
   final String? comment;
+  final String? userDisplayName;
   final List<String> photoUrls;
   final DateTime createdAt;
 
@@ -20,6 +21,7 @@ class ReviewModel {
     required this.orderId,
     required this.rating,
     this.comment,
+    this.userDisplayName,
     this.photoUrls = const [],
     required this.createdAt,
   });
@@ -33,6 +35,7 @@ class ReviewModel {
       orderId: data['orderId'] ?? '',
       rating: (data['rating'] ?? 0).toInt(),
       comment: data['comment'],
+      userDisplayName: data['userDisplayName'],
       photoUrls: List<String>.from(data['photoUrls'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -46,6 +49,7 @@ class ReviewModel {
       'orderId': orderId,
       'rating': rating,
       'comment': comment,
+      'userDisplayName': userDisplayName,
       'photoUrls': photoUrls,
       'createdAt': Timestamp.fromDate(createdAt),
     };
