@@ -1,9 +1,9 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:rentify/main.dart';
+// This file is no longer used - tests are organized in subdirectories
+// See test/unit/ and test/widget/ for actual tests
 
 void main() {
-  testWidgets('App renders correctly', (WidgetTester tester) async {
-    await tester.pumpWidget(const RentifyApp());
-    expect(find.text('Rentify\nCho thuê trang phục trực tuyến'), findsOneWidget);
-  });
+  // Tests moved to:
+  // - test/unit/models/ for model tests
+  // - test/unit/providers/ for provider tests  
+  // - test/widget/ for widget tests
 }

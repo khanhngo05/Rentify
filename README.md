@@ -75,7 +75,26 @@ flutter pub get
 flutter run
 ```
 
-## 🔐 Google Sign-In cho team (SHA cố định)
+## 🧪 Testing
+
+**Status**: ✅ 59 tests passing
+
+```bash
+# Chạy tất cả tests
+flutter test
+
+# Chạy tests với coverage
+flutter test --coverage
+```
+
+Xem chi tiết trong [TESTING.md](TESTING.md) hoặc [docs/TEST_SUMMARY.md](docs/TEST_SUMMARY.md)
+
+**Test Coverage**:
+- ✅ Models: 38 tests (ProductModel, OrderModel, UserModel, CartItemModel)
+- ✅ Widgets: 21 tests (CustomButton, LoadingWidget, IconCircleButton)  
+- 📊 Overall: ~35% code coverage
+
+---
 
 Project này cấu hình Android debug dùng chung `android/app/debug.keystore`, nên các máy trong team sẽ có cùng SHA khi chạy debug.
 
