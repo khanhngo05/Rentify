@@ -37,9 +37,9 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
       }
     }
   }
@@ -101,28 +101,33 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _filteredBranches.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.store_outlined,
-                              size: 64, color: AppColors.textHint),
-                          SizedBox(height: 16),
-                          Text('Không có chi nhánh nào',
-                              style: TextStyle(color: AppColors.textSecondary)),
-                        ],
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.store_outlined,
+                        size: 64,
+                        color: AppColors.textHint,
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadBranches,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredBranches.length,
-                        itemBuilder: (context, index) {
-                          return _buildBranchItem(_filteredBranches[index]);
-                        },
+                      SizedBox(height: 16),
+                      Text(
+                        'Không có chi nhánh nào',
+                        style: TextStyle(color: AppColors.textSecondary),
                       ),
-                    ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadBranches,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredBranches.length,
+                    itemBuilder: (context, index) {
+                      return _buildBranchItem(_filteredBranches[index]);
+                    },
+                  ),
+                ),
         ),
       ],
     );
@@ -135,11 +140,15 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
     final isOpenToday = todayHours?.isOpen ?? false;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.border.withOpacity(0.5)),
+      ),
       child: InkWell(
         onTap: () => _editBranch(branch),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Column(
           children: [
             // Image header
@@ -156,8 +165,11 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                   errorBuilder: (_, __, ___) => Container(
                     height: 120,
                     color: AppColors.shimmerBase,
-                    child: const Icon(Icons.store,
-                        size: 40, color: Colors.white54),
+                    child: const Icon(
+                      Icons.store,
+                      size: 40,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
               ),
@@ -187,8 +199,8 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                         decoration: BoxDecoration(
                           color: branch.isActive
                               ? (isOpenToday
-                                  ? AppColors.success.withOpacity(0.1)
-                                  : AppColors.warning.withOpacity(0.1))
+                                    ? AppColors.success.withOpacity(0.1)
+                                    : AppColors.warning.withOpacity(0.1))
                               : AppColors.error.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -201,8 +213,8 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                             fontWeight: FontWeight.w500,
                             color: branch.isActive
                                 ? (isOpenToday
-                                    ? AppColors.success
-                                    : AppColors.warning)
+                                      ? AppColors.success
+                                      : AppColors.warning)
                                 : AppColors.error,
                           ),
                         ),
@@ -214,8 +226,11 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                   // Address
                   Row(
                     children: [
-                      const Icon(Icons.location_on,
-                          size: 16, color: AppColors.textHint),
+                      const Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: AppColors.textHint,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -235,8 +250,11 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                   // Phone
                   Row(
                     children: [
-                      const Icon(Icons.phone,
-                          size: 16, color: AppColors.textHint),
+                      const Icon(
+                        Icons.phone,
+                        size: 16,
+                        color: AppColors.textHint,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         branch.phone,
@@ -252,8 +270,11 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.access_time,
-                            size: 16, color: AppColors.textHint),
+                        const Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: AppColors.textHint,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${todayHours.open} - ${todayHours.close}',
@@ -272,30 +293,51 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _viewInventory(branch),
-                          icon: const Icon(Icons.inventory_2, size: 18),
-                          label: const Text('Tồn kho'),
+                        child: SizedBox(
+                          height: 44,
+                          child: _buildBranchActionButton(
+                            onPressed: () => _viewInventory(branch),
+                            icon: Icons.inventory_2,
+                            label: 'Tồn kho',
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _editBranch(branch),
-                          icon: const Icon(Icons.edit, size: 18),
-                          label: const Text('Chỉnh sửa'),
+                        child: SizedBox(
+                          height: 44,
+                          child: _buildBranchActionButton(
+                            onPressed: () => _editBranch(branch),
+                            icon: Icons.edit,
+                            label: 'Chỉnh sửa',
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => _toggleBranchStatus(branch),
-                        icon: Icon(
-                          branch.isActive ? Icons.visibility_off : Icons.visibility,
-                          color: branch.isActive
-                              ? AppColors.textHint
-                              : AppColors.success,
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.border.withOpacity(0.6),
+                          ),
                         ),
-                        tooltip: branch.isActive ? 'Đóng cửa' : 'Mở cửa',
+                        child: IconButton(
+                          onPressed: () => _toggleBranchStatus(branch),
+                          iconSize: 20,
+                          padding: EdgeInsets.zero,
+                          tooltip: branch.isActive ? 'Đóng cửa' : 'Mở cửa',
+                          icon: Icon(
+                            branch.isActive
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: branch.isActive
+                                ? AppColors.textHint
+                                : AppColors.success,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -308,6 +350,42 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
     );
   }
 
+  Widget _buildBranchActionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+  }) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        side: BorderSide(color: AppColors.primary.withOpacity(0.7), width: 1.2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                height: 1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getDayName(int weekday) {
     const days = [
       'monday',
@@ -316,7 +394,7 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
       'thursday',
       'friday',
       'saturday',
-      'sunday'
+      'sunday',
     ];
     return days[weekday - 1];
   }
@@ -334,9 +412,7 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
   void _editBranch(BranchModel branch) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AdminBranchFormScreen(branch: branch),
-      ),
+      MaterialPageRoute(builder: (_) => AdminBranchFormScreen(branch: branch)),
     );
     if (result == true) {
       _loadBranches();
@@ -354,7 +430,7 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
 
   void _toggleBranchStatus(BranchModel branch) async {
     final action = branch.isActive ? 'đóng cửa' : 'mở cửa lại';
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -368,8 +444,9 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  branch.isActive ? AppColors.error : AppColors.success,
+              backgroundColor: branch.isActive
+                  ? AppColors.error
+                  : AppColors.success,
               foregroundColor: Colors.white,
             ),
             child: Text(branch.isActive ? 'Đóng cửa' : 'Mở cửa'),
@@ -385,15 +462,15 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
         });
         _loadBranches();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã $action chi nhánh')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Đã $action chi nhánh')));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Lỗi: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
         }
       }
     }
