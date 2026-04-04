@@ -35,11 +35,22 @@ dependencies:
   go_router: ^14.8.1
   url_launcher: ^6.3.1
   provider: ^6.1.5+1
+  local_auth: ^2.3.0
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: assets/icons/app_icon.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/icons/app_icon_foreground.png
 
 flutter:
   uses-material-design: true

@@ -1,110 +1,103 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
+
 import '../constants/app_constants.dart';
-import '../viewmodels/splash_view_model.dart';
-import 'home_screen.dart';
 
-/// Splash screen that displays app logo and name, then navigates to Home.
-/// Waits for [splashDuration] before navigating. Default is 2 hours.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key, this.splashDuration});
+  const SplashScreen({super.key, this.nextScreen, this.durationSeconds = 2});
 
-  // default to 2 hours as requested; in tests you can pass shorter duration.
-  final Duration? splashDuration;
+  final Widget? nextScreen;
+  final int durationSeconds;
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  late final SplashViewModel _viewModel;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = SplashViewModel(splashDuration: widget.splashDuration);
-    _viewModel.addListener(_onViewModelChanged);
-    _viewModel.start();
-  }
-
-  void _onViewModelChanged() {
-    if (!mounted || !_viewModel.navigateToHome) {
-      return;
+    if (widget.nextScreen != null) {
+      _timer = Timer(Duration(seconds: widget.durationSeconds), () {
+        if (!mounted) {
+          return;
+        }
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => widget.nextScreen!),
+        );
+      });
     }
-    _viewModel.markNavigationHandled();
-    _goHome();
-  }
-
-  void _goHome() {
-    if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
   void dispose() {
-    _viewModel.removeListener(_onViewModelChanged);
-    _viewModel.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Simple circular logo made from the primary color and app initial.
-    return GestureDetector(
-      onTap: _viewModel.skip, // allow tap to skip the long wait
-      child: Scaffold(
-        backgroundColor: AppColors.surface,
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.18),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      AppConstants.appName.substring(0, 1),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  AppConstants.appName,
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  AppConstants.appTagline,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFF8FAFF), Color(0xFFEAF0FF)],
           ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 108,
+              height: 108,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.checkroom_rounded,
+                size: 58,
+                color: Color(0xFF1F4B99),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              AppConstants.appName,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1F2A44),
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Cho thuê trang phục trực tuyến',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: const Color(0xFF526179),
+              ),
+            ),
+            const SizedBox(height: 40),
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.8),
+            ),
+          ],
         ),
       ),
     );

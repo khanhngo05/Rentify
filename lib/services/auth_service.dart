@@ -8,8 +8,22 @@ import '../models/user_model.dart';
 
 /// Service xu ly dang nhap, dang ky, dang xuat.
 class AuthService {
+  static String? _pendingPostLoginBypassUid;
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  void _markPostLoginBypass(String uid) {
+    _pendingPostLoginBypassUid = uid;
+  }
+
+  bool consumePostLoginBypass(String uid) {
+    if (_pendingPostLoginBypassUid == uid) {
+      _pendingPostLoginBypassUid = null;
+      return true;
+    }
+    return false;
+  }
 
   /// User hien tai (null neu chua dang nhap).
   User? get currentUser => _auth.currentUser;
@@ -42,6 +56,8 @@ class AuthService {
       );
     }
 
+    _markPostLoginBypass(firebaseUser.uid);
+
     return _upsertUserFromFirebaseUser(
       firebaseUser,
       fallbackEmail: email,
@@ -63,26 +79,48 @@ class AuthService {
     final firebaseUser = credential.user;
     if (firebaseUser == null) return null;
 
+    _markPostLoginBypass(firebaseUser.uid);
+
     return _upsertUserFromFirebaseUser(firebaseUser, fallbackEmail: email);
   }
 
   /// Dang nhap bang Google.
-  Future<UserModel> signInWithGoogle() async {
+  Future<UserModel> signInWithGoogle({
+    bool forceAccountSelection = true,
+    bool silentOnly = false,
+  }) async {
     UserCredential credential;
     try {
       if (kIsWeb) {
         final provider = GoogleAuthProvider();
-        provider.setCustomParameters(<String, String>{'prompt': 'select_account'});
+        if (forceAccountSelection) {
+          provider.setCustomParameters(<String, String>{
+            'prompt': 'select_account',
+          });
+        }
         credential = await _auth.signInWithPopup(provider);
       } else {
         final googleSignIn = GoogleSignIn(scopes: <String>['email', 'profile']);
-        await googleSignIn.signOut();
-        final googleUser = await googleSignIn.signIn();
+        GoogleSignInAccount? googleUser;
+
+        if (forceAccountSelection) {
+          await googleSignIn.signOut();
+          googleUser = await googleSignIn.signIn();
+        } else {
+          googleUser = await googleSignIn.signInSilently();
+          if (googleUser == null && !silentOnly) {
+            googleUser = await googleSignIn.signIn();
+          }
+        }
 
         if (googleUser == null) {
           throw FirebaseAuthException(
-            code: 'sign_in_canceled',
-            message: 'Nguoi dung da huy dang nhap Google.',
+            code: silentOnly
+                ? 'silent_sign_in_unavailable'
+                : 'sign_in_canceled',
+            message: silentOnly
+                ? 'Chua co tai khoan Google da dang nhap tren thiet bi.'
+                : 'Nguoi dung da huy dang nhap Google.',
           );
         }
 
@@ -115,6 +153,8 @@ class AuthService {
         message: 'Dang nhap Google khong thanh cong.',
       );
     }
+
+    _markPostLoginBypass(firebaseUser.uid);
 
     return _upsertUserFromFirebaseUser(firebaseUser);
   }

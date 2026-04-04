@@ -41,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (user == null && mounted) {
         _showError('Đăng nhập thất bại. Kiểm tra lại thông tin.');
+        return;
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) _showError(_getErrorMessage(e.code));
@@ -89,6 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Quá nhiều lần thử. Vui lòng đợi một lúc.';
       case 'network-request-failed':
         return 'Lỗi kết nối mạng.';
+      case 'sign_in_canceled':
+        return 'Bạn đã hủy đăng nhập Google.';
       default:
         return 'Đăng nhập thất bại ($code).';
     }
@@ -102,10 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primary,
-              AppColors.primaryDark,
-            ],
+            colors: [AppColors.primary, AppColors.primaryDark],
           ),
         ),
         child: SafeArea(
@@ -263,7 +263,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               const Expanded(child: Divider()),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
                                 child: Text(
                                   'hoặc',
                                   style: TextStyle(

@@ -1,0 +1,119 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class RememberedUserProfile {
+  const RememberedUserProfile({
+    required this.uid,
+    required this.displayName,
+    this.avatarUrl,
+    this.email,
+  });
+
+  final String uid;
+  final String displayName;
+  final String? avatarUrl;
+  final String? email;
+}
+
+class BiometricPreferenceService {
+  static const String _keyPrefix = 'biometric_login_enabled_';
+  static const String _globalEnabledKey = 'biometric_login_enabled_global';
+  static const String _lastUidKey = 'last_login_uid';
+  static const String _lastDisplayNameKey = 'last_login_display_name';
+  static const String _lastAvatarUrlKey = 'last_login_avatar_url';
+  static const String _lastEmailKey = 'last_login_email';
+
+  String _keyForUser(String uid) => '$_keyPrefix$uid';
+
+  Future<bool> isEnabledForUser(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyForUser(uid)) ?? false;
+  }
+
+  Future<bool> isBiometricLoginEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_globalEnabledKey) ?? false;
+  }
+
+  Future<void> setEnabledForUser(String uid, bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyForUser(uid), enabled);
+    await prefs.setBool(_globalEnabledKey, enabled);
+  }
+
+  Future<void> saveRememberedUserProfile(
+    User user, {
+    String? displayNameOverride,
+    String? avatarUrlOverride,
+    String? emailOverride,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final displayName = displayNameOverride?.trim().isNotEmpty == true
+        ? displayNameOverride!.trim()
+        : user.displayName?.trim();
+    final fallbackName = emailOverride?.trim().isNotEmpty == true
+        ? emailOverride!.trim()
+        : user.email?.trim();
+
+    await prefs.setString(_lastUidKey, user.uid);
+    await prefs.setString(
+      _lastDisplayNameKey,
+      (displayName?.isNotEmpty == true
+          ? displayName!
+          : (fallbackName ?? 'Rentify User')),
+    );
+
+    final avatar = avatarUrlOverride?.trim().isNotEmpty == true
+        ? avatarUrlOverride!.trim()
+        : user.photoURL?.trim();
+    if (avatar != null && avatar.isNotEmpty) {
+      await prefs.setString(_lastAvatarUrlKey, avatar);
+    } else {
+      await prefs.remove(_lastAvatarUrlKey);
+    }
+
+    final email = emailOverride?.trim().isNotEmpty == true
+        ? emailOverride!.trim()
+        : user.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      await prefs.setString(_lastEmailKey, email);
+    } else {
+      await prefs.remove(_lastEmailKey);
+    }
+  }
+
+  Future<RememberedUserProfile?> getRememberedUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final uid = prefs.getString(_lastUidKey);
+    final displayName = prefs.getString(_lastDisplayNameKey);
+
+    if (uid == null ||
+        uid.trim().isEmpty ||
+        displayName == null ||
+        displayName.trim().isEmpty) {
+      return null;
+    }
+
+    final avatar = prefs.getString(_lastAvatarUrlKey);
+    final email = prefs.getString(_lastEmailKey);
+    return RememberedUserProfile(
+      uid: uid,
+      displayName: displayName,
+      avatarUrl: avatar,
+      email: email,
+    );
+  }
+
+  Future<void> clearRememberedUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_lastUidKey);
+    await prefs.remove(_lastDisplayNameKey);
+    await prefs.remove(_lastAvatarUrlKey);
+    await prefs.remove(_lastEmailKey);
+  }
+
+  Future<void> clearForUser(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyForUser(uid));
+  }
+}
