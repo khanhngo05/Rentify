@@ -521,7 +521,7 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         ),
                         onPressed: () => _goCheckout(context, selectedItems),
-                        child: Text('Mua hàng (${selectedItems.length})'),
+                        child: Text('Thuê ngay (${selectedItems.length})'),
                       ),
                     ),
                   ],
