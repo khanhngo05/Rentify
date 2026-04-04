@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -95,7 +96,9 @@ class _OrderScreenState extends State<OrderScreen>
     final shouldResetCaches = _uid != uid;
     setState(() {
       _uid = uid;
-      _ordersFuture = uid == null ? null : _firebaseService.getOrdersByUser(uid);
+      _ordersFuture = uid == null
+          ? null
+          : _firebaseService.getOrdersByUser(uid);
       if (shouldResetCaches) {
         _reviewedByOrderItem.clear();
         _reviewCheckingKeys.clear();
@@ -154,7 +157,8 @@ class _OrderScreenState extends State<OrderScreen>
         return;
       }
 
-      if (_reviewedByOrderItem.containsKey(key) || _reviewCheckingKeys.contains(key)) {
+      if (_reviewedByOrderItem.containsKey(key) ||
+          _reviewCheckingKeys.contains(key)) {
         _reviewCheckQueuedKeys.remove(key);
         return;
       }
@@ -189,7 +193,10 @@ class _OrderScreenState extends State<OrderScreen>
     });
   }
 
-  Future<void> _showReviewDialogForItem(OrderModel order, OrderItem item) async {
+  Future<void> _showReviewDialogForItem(
+    OrderModel order,
+    OrderItem item,
+  ) async {
     if (order.status != 'completed') return;
     final uid = _uid;
     if (uid == null) {
@@ -201,7 +208,8 @@ class _OrderScreenState extends State<OrderScreen>
     }
 
     final key = _reviewKey(order.id, item.productId);
-    if (_reviewedByOrderItem[key] == true || _reviewSubmittingKeys.contains(key)) {
+    if (_reviewedByOrderItem[key] == true ||
+        _reviewSubmittingKeys.contains(key)) {
       return;
     }
 
@@ -341,7 +349,10 @@ class _OrderScreenState extends State<OrderScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                _detailRow('Trạng thái', AppConstants.getStatusName(order.status)),
+                _detailRow(
+                  'Trạng thái',
+                  AppConstants.getStatusName(order.status),
+                ),
                 _detailRow('Chi nhánh', order.branchName),
                 _detailRow('Địa chỉ', order.branchAddress),
                 _detailRow(
@@ -409,23 +420,32 @@ class _OrderScreenState extends State<OrderScreen>
                   'Tổng tiền thuê',
                   AppConstants.formatPrice(order.totalRentalFee),
                 ),
-                _detailRow('Đặt cọc', AppConstants.formatPrice(order.depositPaid)),
+                _detailRow(
+                  'Đặt cọc',
+                  AppConstants.formatPrice(order.depositPaid),
+                ),
                 _detailRow(
                   'Tổng cộng',
-                  AppConstants.formatPrice(order.totalRentalFee + order.depositPaid),
+                  AppConstants.formatPrice(
+                    order.totalRentalFee + order.depositPaid,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (_canCancel(order))
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                      ),
                       onPressed: () async {
                         final ok = await showDialog<bool>(
                           context: context,
                           builder: (dialogContext) => AlertDialog(
                             title: const Text('Xác nhận hủy đơn'),
-                            content: Text('Bạn muốn hủy đơn #${_code(order.id)}?'),
+                            content: Text(
+                              'Bạn muốn hủy đơn #${_code(order.id)}?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () =>
@@ -656,12 +676,20 @@ class _OrderScreenState extends State<OrderScreen>
               const SizedBox(height: 6),
               Text(
                 '${_date(order.rentalStartDate)} - ${_date(order.rentalEndDate)} • ${order.rentalDays} ngày',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
-                order.branchName.trim().isEmpty ? 'Chi nhánh chưa xác định' : order.branchName,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                order.branchName.trim().isEmpty
+                    ? 'Chi nhánh chưa xác định'
+                    : order.branchName,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
               const Divider(height: 18),
               ...previewItems.map((item) => _buildProductRow(order, item)),
@@ -725,7 +753,10 @@ class _OrderScreenState extends State<OrderScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: AppColors.error),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: AppColors.error,
+                  ),
                   const SizedBox(height: 8),
                   const Text('Không thể tải đơn hàng'),
                   const SizedBox(height: 12),
@@ -787,7 +818,8 @@ class _OrderScreenState extends State<OrderScreen>
                         padding: const EdgeInsets.all(16),
                         itemCount: orders.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, index) => _buildOrderCard(orders[index]),
+                        itemBuilder: (_, index) =>
+                            _buildOrderCard(orders[index]),
                       ),
                     );
                   }).toList(),
@@ -829,11 +861,7 @@ class _StatusTab {
 }
 
 class _ReviewDraft {
-  const _ReviewDraft({
-    required this.rating,
-    this.comment,
-    this.images,
-  });
+  const _ReviewDraft({required this.rating, this.comment, this.images});
 
   final int rating;
   final String? comment;
@@ -862,7 +890,8 @@ class _ReviewInputDialogState extends State<_ReviewInputDialog> {
   }
 
   Future<void> _pickImages() async {
-    final remainingSlots = AppConstants.maxReviewPhotos - _selectedImages.length;
+    final remainingSlots =
+        AppConstants.maxReviewPhotos - _selectedImages.length;
     if (remainingSlots <= 0) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -991,27 +1020,44 @@ class _ReviewInputDialogState extends State<_ReviewInputDialog> {
                 children: _selectedImages.asMap().entries.map((entry) {
                   final index = entry.key;
                   final imageFile = entry.value;
-                  
+
                   return Stack(
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(imageFile.path),
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          cacheWidth: 200,
-                          cacheHeight: 200,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 100,
-                              height: 100,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.error),
-                            );
-                          },
-                        ),
+                        child: kIsWeb
+                            ? Image.network(
+                                imageFile.path,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                cacheWidth: 200,
+                                cacheHeight: 200,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.error),
+                                  );
+                                },
+                              )
+                            : Image.file(
+                                File(imageFile.path),
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                cacheWidth: 200,
+                                cacheHeight: 200,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.error),
+                                  );
+                                },
+                              ),
                       ),
                       Positioned(
                         top: 4,
