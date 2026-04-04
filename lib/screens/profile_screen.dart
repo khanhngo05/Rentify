@@ -448,12 +448,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final current = _authService.currentUser;
     if (current == null) return;
 
-    await _firebaseService.removeFavorite(current.uid, productId);
-    await _loadFavorites();
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Đã xóa khỏi yêu thích')));
+    FavoriteModel? removed;
+    int removedIndex = -1;
+    for (var i = 0; i < _favorites.length; i++) {
+      if (_favorites[i].productId == productId) {
+        removed = _favorites[i];
+        removedIndex = i;
+        break;
+      }
+    }
+
+    if (removed == null) return;
+
+    setState(() {
+      _favorites.removeWhere((item) => item.productId == productId);
+    });
+
+    try {
+      await _firebaseService.removeFavorite(current.uid, productId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã xóa khỏi yêu thích')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final insertAt = removedIndex.clamp(0, _favorites.length);
+        _favorites.insert(insertAt, removed!);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể cập nhật yêu thích lúc này')),
+      );
+    }
   }
 
   Future<void> _showSignOutDialog() async {
@@ -728,6 +754,7 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
   List<FavoriteModel> _favorites = <FavoriteModel>[];
   List<Product> _products = <Product>[];
   Set<String> _favoriteIds = <String>{};
+  final Set<String> _updatingFavoriteIds = <String>{};
   bool _isLoading = true;
 
   @override
@@ -778,33 +805,66 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
 
   Future<void> _toggleFavorite(Product product) async {
     final current = _authService.currentUser;
-    if (current == null) return;
+    if (current == null || _updatingFavoriteIds.contains(product.id)) return;
 
     final isFavorite = _favoriteIds.contains(product.id);
-    if (isFavorite) {
-      await _firebaseService.removeFavorite(current.uid, product.id);
-    } else {
-      await _firebaseService.addFavorite(
-        current.uid,
-        FavoriteModel(
-          productId: product.id,
-          productName: product.name,
-          thumbnailUrl: product.thumbnailUrl,
-          rentalPricePerDay: product.rentalPricePerDay,
-          addedAt: DateTime.now(),
+
+    final optimisticFavorite = FavoriteModel(
+      productId: product.id,
+      productName: product.name,
+      thumbnailUrl: product.thumbnailUrl,
+      rentalPricePerDay: product.rentalPricePerDay,
+      addedAt: DateTime.now(),
+    );
+
+    setState(() {
+      _updatingFavoriteIds.add(product.id);
+      if (isFavorite) {
+        _favoriteIds.remove(product.id);
+        _favorites.removeWhere((item) => item.productId == product.id);
+      } else {
+        _favoriteIds.add(product.id);
+        _favorites.removeWhere((item) => item.productId == product.id);
+        _favorites.insert(0, optimisticFavorite);
+      }
+    });
+
+    try {
+      if (isFavorite) {
+        await _firebaseService.removeFavorite(current.uid, product.id);
+      } else {
+        await _firebaseService.addFavorite(current.uid, optimisticFavorite);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isFavorite ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích',
+          ),
         ),
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (isFavorite) {
+          _favoriteIds.add(product.id);
+          _favorites.removeWhere((item) => item.productId == product.id);
+          _favorites.insert(0, optimisticFavorite);
+        } else {
+          _favoriteIds.remove(product.id);
+          _favorites.removeWhere((item) => item.productId == product.id);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể cập nhật yêu thích lúc này')),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _updatingFavoriteIds.remove(product.id);
+      });
     }
-
-    await _loadData();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isFavorite ? 'Đã xóa khỏi yêu thích' : 'Đã thêm vào yêu thích',
-        ),
-      ),
-    );
   }
 
   Future<void> _openProductDetail(String productId) async {
@@ -897,10 +957,21 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
                                     );
                                     _toggleFavorite(product);
                                   },
-                                  icon: const Icon(
-                                    Icons.favorite_rounded,
-                                    color: AppColors.favorite,
-                                  ),
+                                  icon:
+                                      _updatingFavoriteIds.contains(
+                                        item.productId,
+                                      )
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.favorite_rounded,
+                                          color: AppColors.favorite,
+                                        ),
                                 ),
                               ),
                             )
@@ -917,6 +988,9 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
                     child: Column(
                       children: _products.take(8).map((product) {
                         final isFavorite = _favoriteIds.contains(product.id);
+                        final isUpdating = _updatingFavoriteIds.contains(
+                          product.id,
+                        );
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           onTap: () {
@@ -956,15 +1030,25 @@ class _FavoriteListScreenState extends State<FavoriteListScreen> {
                             tooltip: isFavorite
                                 ? 'Xóa khỏi yêu thích'
                                 : 'Thêm vào yêu thích',
-                            onPressed: () => _toggleFavorite(product),
-                            icon: Icon(
-                              isFavorite
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: isFavorite
-                                  ? AppColors.favorite
-                                  : AppColors.textSecondary,
-                            ),
+                            onPressed: isUpdating
+                                ? null
+                                : () => _toggleFavorite(product),
+                            icon: isUpdating
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    isFavorite
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: isFavorite
+                                        ? AppColors.favorite
+                                        : AppColors.textSecondary,
+                                  ),
                           ),
                         );
                       }).toList(),

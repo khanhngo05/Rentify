@@ -16,12 +16,18 @@ import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/biometric_preference_service.dart';
 import 'services/firebase_service.dart';
+import 'services/push_notification_service.dart';
 import 'providers/cart_provider.dart'; // Phần bạn thêm: Import CartProvider của bạn
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    await PushNotificationService.instance.initialize();
+  } catch (e) {
+    debugPrint('Push service init error (ignored): $e');
+  }
 
   try {
     await supabase.Supabase.initialize(
@@ -322,6 +328,12 @@ class _AuthGateState extends State<AuthGate> {
                       _markBiometricVerified(user.uid);
                     },
                     onUseAnotherAccount: () async {
+                      if (mounted) {
+                        setState(() {
+                          _forceShowLoginFormWhenLoggedOut = true;
+                          _skipBiometricOnceForAccountSwitch = true;
+                        });
+                      }
                       await _authService.signOut();
                     },
                   );

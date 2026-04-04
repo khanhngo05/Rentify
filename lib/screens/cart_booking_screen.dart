@@ -18,12 +18,14 @@ class CartBookingScreen extends StatefulWidget {
     required this.branchName,
     required this.branchAddress,
     this.directItems,
+    this.removeDirectItemsOnSuccess = false,
   });
 
   final String branchId;
   final String branchName;
   final String branchAddress;
   final List<CartItemModel>? directItems;
+  final bool removeDirectItemsOnSuccess;
 
   @override
   State<CartBookingScreen> createState() => _CartBookingScreenState();
@@ -159,7 +161,9 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
     // Kiểm tra thông tin người nhận
     if (!_hasReceiverInfo) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập đầy đủ thông tin người nhận!')),
+        const SnackBar(
+          content: Text('Vui lòng nhập đầy đủ thông tin người nhận!'),
+        ),
       );
       return;
     }
@@ -175,9 +179,9 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
     final cartProvider = context.read<CartProvider>();
     final bookingItems = _effectiveItems(cartProvider);
     if (bookingItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Giỏ hàng trống!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Giỏ hàng trống!')));
       return;
     }
 
@@ -229,9 +233,12 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
 
       if (!mounted) return;
 
-      // Chỉ xóa giỏ khi đi từ luồng giỏ hàng.
+      // Từ luồng giỏ hàng thông thường: xóa toàn bộ.
       if (!_isDirectCheckout) {
         await cartProvider.clearCart();
+      } else if (widget.removeDirectItemsOnSuccess) {
+        // Từ luồng chọn item trong giỏ: chỉ xóa các item đã checkout.
+        await cartProvider.removeItems(bookingItems);
       }
 
       // Hiển thị thông báo thành công
@@ -267,9 +274,7 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
         appBar: AppBar(
           title: Text(_isDirectCheckout ? 'Thuê ngay' : 'Thuê từ giỏ hàng'),
         ),
-        body: const Center(
-          child: Text('Giỏ hàng trống!'),
-        ),
+        body: const Center(child: Text('Giỏ hàng trống!')),
       );
     }
 
@@ -348,64 +353,71 @@ class _CartBookingScreenState extends State<CartBookingScreen> {
               children: [
                 Text(
                   'Sản phẩm thuê (${cartItems.length} món)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 10),
-                ...cartItems.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              item.imageUrl,
+                ...cartItems.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            item.imageUrl,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
                               width: 64,
                               height: 64,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 64,
-                                height: 64,
-                                color: AppColors.shimmerBase,
-                                child: const Icon(Icons.image_not_supported_rounded),
+                              color: AppColors.shimmerBase,
+                              child: const Icon(
+                                Icons.image_not_supported_rounded,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.productName,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.productName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Size: ${item.selectedSize} | Màu: ${item.selectedColor}',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                  ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Size: ${item.selectedSize} | Màu: ${item.selectedColor}',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
                                 ),
-                                Text(
-                                  'SL: ${item.quantity} | ${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                  ),
+                              ),
+                              Text(
+                                'SL: ${item.quantity} | ${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    )),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

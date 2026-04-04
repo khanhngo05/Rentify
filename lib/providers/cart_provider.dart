@@ -10,6 +10,10 @@ class CartProvider with ChangeNotifier {
   List<CartItemModel> get cartItems => _cartItems;
   bool get isLoading => _isLoading;
 
+  int get totalItemCount {
+    return _cartItems.fold(0, (sum, item) => sum + item.quantity);
+  }
+
   // Tổng tiền thuê toàn giỏ hàng
   double get totalRentalPrice {
     return _cartItems.fold(0, (sum, item) => sum + item.totalItemRental);
@@ -77,10 +81,14 @@ class CartProvider with ChangeNotifier {
 
       if (doc.exists) {
         final data = doc.data()!;
-        final items = (data['items'] as List<dynamic>?)
-            ?.map((item) => CartItemModel.fromMap(item as Map<String, dynamic>))
-            .toList() ?? [];
-        
+        final items =
+            (data['items'] as List<dynamic>?)
+                ?.map(
+                  (item) => CartItemModel.fromMap(item as Map<String, dynamic>),
+                )
+                .toList() ??
+            [];
+
         _cartItems.clear();
         _cartItems.addAll(items);
       }
@@ -117,11 +125,12 @@ class CartProvider with ChangeNotifier {
     // Cho phép thêm từ nhiều chi nhánh - sẽ tách đơn khi checkout
 
     // Kiểm tra xem sản phẩm cùng size và màu đã có chưa
-    int index = _cartItems.indexWhere((item) => 
-      item.productId == newItem.productId && 
-      item.selectedSize == newItem.selectedSize &&
-      item.selectedColor == newItem.selectedColor &&
-      item.branchId == newItem.branchId // Thêm điều kiện branch
+    int index = _cartItems.indexWhere(
+      (item) =>
+          item.productId == newItem.productId &&
+          item.selectedSize == newItem.selectedSize &&
+          item.selectedColor == newItem.selectedColor &&
+          item.branchId == newItem.branchId, // Thêm điều kiện branch
     );
 
     if (index >= 0) {
@@ -132,7 +141,10 @@ class CartProvider with ChangeNotifier {
         return false;
       }
 
-      item.quantity = (item.quantity + newItem.quantity).clamp(1, item.availableStock);
+      item.quantity = (item.quantity + newItem.quantity).clamp(
+        1,
+        item.availableStock,
+      );
     } else {
       // Chưa có -> Thêm mới, đồng thời clamp theo tồn kho.
       final safeItem = CartItemModel(
@@ -166,11 +178,13 @@ class CartProvider with ChangeNotifier {
     bool isIncrement, {
     Function()? onConfirmRemove, // Callback khi cần confirm xóa
   }) async {
-    int index = _cartItems.indexWhere((item) =>
-        item.productId == productId &&
-        item.selectedSize == size &&
-        item.selectedColor == color &&
-        item.branchId == branchId);
+    int index = _cartItems.indexWhere(
+      (item) =>
+          item.productId == productId &&
+          item.selectedSize == size &&
+          item.selectedColor == color &&
+          item.branchId == branchId,
+    );
 
     if (index >= 0) {
       if (isIncrement) {
@@ -201,14 +215,45 @@ class CartProvider with ChangeNotifier {
   }
 
   // Hàm xóa khỏi giỏ
-  Future<void> removeFromCart(String productId, String size, String color, String branchId) async {
-    _cartItems.removeWhere((item) =>
-        item.productId == productId &&
-        item.selectedSize == size &&
-        item.selectedColor == color &&
-        item.branchId == branchId);
+  Future<void> removeFromCart(
+    String productId,
+    String size,
+    String color,
+    String branchId,
+  ) async {
+    _cartItems.removeWhere(
+      (item) =>
+          item.productId == productId &&
+          item.selectedSize == size &&
+          item.selectedColor == color &&
+          item.branchId == branchId,
+    );
     notifyListeners();
     await _saveCart(); // Lưu vào Firestore
+  }
+
+  // Xóa một danh sách item cụ thể (dùng cho checkout theo lựa chọn).
+  Future<void> removeItems(List<CartItemModel> items) async {
+    if (items.isEmpty) return;
+
+    bool changed = false;
+    for (final target in items) {
+      final before = _cartItems.length;
+      _cartItems.removeWhere(
+        (item) =>
+            item.productId == target.productId &&
+            item.selectedSize == target.selectedSize &&
+            item.selectedColor == target.selectedColor &&
+            item.branchId == target.branchId,
+      );
+      if (_cartItems.length != before) {
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+    notifyListeners();
+    await _saveCart();
   }
 
   // Xóa sạch giỏ sau khi đặt đơn thành công

@@ -8,16 +8,12 @@ import '../../models/product_model.dart';
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback? onTap;
-  final VoidCallback? onFavoriteTap;
-  final bool isFavorite;
   final bool showCategoryBadge;
 
   const ProductCard({
     super.key,
     required this.product,
     this.onTap,
-    this.onFavoriteTap,
-    this.isFavorite = false,
     this.showCategoryBadge = true,
   });
 
@@ -38,31 +34,6 @@ class ProductCard extends StatelessWidget {
                 children: [
                   // Ảnh
                   _ProductImage(product: product),
-
-                  // Nút yêu thích ❤️
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: GestureDetector(
-                      onTap: onFavoriteTap,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: isFavorite
-                              ? AppColors.favorite
-                              : AppColors.textHint,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ),
 
                   // Badge danh mục (chỉ hiển thị nếu showCategoryBadge)
                   if (showCategoryBadge)

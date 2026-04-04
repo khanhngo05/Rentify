@@ -50,6 +50,25 @@ class FirebaseService {
     }
   }
 
+  /// Stream sản phẩm đang hoạt động để phục vụ thông báo khuyến mãi realtime.
+  Stream<List<Product>> streamActiveProducts({int limit = 30}) {
+    return _db
+        .collection(AppConstants.productsCollection)
+        .where('isActive', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+          final products = snapshot.docs
+              .map((doc) => Product.fromFirestore(doc.data(), doc.id))
+              .toList();
+
+          products.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          if (products.length > limit) {
+            return products.sublist(0, limit);
+          }
+          return products;
+        });
+  }
+
   /// Lấy sản phẩm theo danh mục
   Future<List<Product>> getProductsByCategory(String category) async {
     try {
@@ -247,6 +266,22 @@ class FirebaseService {
     }
   }
 
+  /// Stream lịch sử đơn thuê realtime của 1 user.
+  Stream<List<OrderModel>> streamOrdersByUser(String userId) {
+    return _db
+        .collection(AppConstants.ordersCollection)
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final orders = snapshot.docs
+              .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+              .toList();
+
+          orders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+          return orders;
+        });
+  }
+
   /// Lấy các đơn đã hoàn thành của 1 user.
   Future<List<OrderModel>> getCompletedOrdersByUser(String userId) async {
     try {
@@ -410,10 +445,7 @@ class FirebaseService {
   }
 
   /// Tạo đánh giá mới + cập nhật rating trung bình của sản phẩm
-  Future<String> createReview(
-    ReviewModel review, {
-    List<XFile>? images,
-  }) async {
+  Future<String> createReview(ReviewModel review, {List<XFile>? images}) async {
     if (review.orderId.trim().isEmpty) {
       throw FirebaseException(
         plugin: 'cloud_firestore',
@@ -477,13 +509,13 @@ class FirebaseService {
         try {
           final imageFile = File(images[i].path);
           final fileName = '${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
-          
+
           final url = await _supabaseService.uploadReviewPhoto(
             reviewId: docRef.id,
             imageFile: imageFile,
             fileName: fileName,
           );
-          
+
           if (url != null) {
             photoUrls.add(url);
           }
@@ -601,5 +633,27 @@ class FirebaseService {
   /// Cập nhật thông tin user
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
     await _db.collection(AppConstants.usersCollection).doc(uid).update(data);
+  }
+
+  /// Lưu FCM token để nhận thông báo đẩy theo user.
+  Future<void> saveUserFcmToken(String uid, String token) async {
+    final cleanToken = token.trim();
+    if (cleanToken.isEmpty) return;
+
+    await _db.collection(AppConstants.usersCollection).doc(uid).set({
+      'fcmTokens': FieldValue.arrayUnion(<String>[cleanToken]),
+      'updatedAt': Timestamp.now(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Gỡ FCM token khi đăng xuất hoặc token không còn hợp lệ.
+  Future<void> removeUserFcmToken(String uid, String token) async {
+    final cleanToken = token.trim();
+    if (cleanToken.isEmpty) return;
+
+    await _db.collection(AppConstants.usersCollection).doc(uid).set({
+      'fcmTokens': FieldValue.arrayRemove(<String>[cleanToken]),
+      'updatedAt': Timestamp.now(),
+    }, SetOptions(merge: true));
   }
 }

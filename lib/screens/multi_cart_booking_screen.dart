@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
+import '../models/cart_item_model.dart';
 import '../providers/cart_provider.dart';
 import '../models/order_model.dart';
 import '../services/firebase_service.dart';
@@ -13,7 +14,14 @@ import '../services/firebase_service.dart';
 /// Màn hình đặt thuê cho giỏ hàng có nhiều chi nhánh
 /// Tự động tách thành nhiều đơn hàng theo chi nhánh
 class MultiCartBookingScreen extends StatefulWidget {
-  const MultiCartBookingScreen({super.key});
+  const MultiCartBookingScreen({
+    super.key,
+    this.directItems,
+    this.removeDirectItemsOnSuccess = false,
+  });
+
+  final List<CartItemModel>? directItems;
+  final bool removeDirectItemsOnSuccess;
 
   @override
   State<MultiCartBookingScreen> createState() => _MultiCartBookingScreenState();
@@ -34,6 +42,22 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
 
   int get _rentalDays =>
       _rentalRange.end.difference(_rentalRange.start).inDays + 1;
+
+  bool get _isDirectCheckout => widget.directItems != null;
+
+  List<CartItemModel> _effectiveItems(CartProvider cartProvider) {
+    return _isDirectCheckout ? widget.directItems! : cartProvider.cartItems;
+  }
+
+  Map<String, List<CartItemModel>> _groupItemsByBranch(
+    List<CartItemModel> items,
+  ) {
+    final grouped = <String, List<CartItemModel>>{};
+    for (final item in items) {
+      grouped.putIfAbsent(item.branchId, () => <CartItemModel>[]).add(item);
+    }
+    return grouped;
+  }
 
   @override
   void initState() {
@@ -127,7 +151,9 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
   Future<void> _submitOrders() async {
     if (!_hasReceiverInfo) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập đầy đủ thông tin người nhận!')),
+        const SnackBar(
+          content: Text('Vui lòng nhập đầy đủ thông tin người nhận!'),
+        ),
       );
       return;
     }
@@ -141,10 +167,11 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
     }
 
     final cartProvider = context.read<CartProvider>();
-    if (cartProvider.cartItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Giỏ hàng trống!')),
-      );
+    final bookingItems = _effectiveItems(cartProvider);
+    if (bookingItems.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Giỏ hàng trống!')));
       return;
     }
 
@@ -153,7 +180,7 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
     try {
       final now = DateTime.now();
       final firebaseService = FirebaseService();
-      final itemsByBranch = cartProvider.itemsByBranch;
+      final itemsByBranch = _groupItemsByBranch(bookingItems);
       final List<String> orderIds = [];
 
       // Tạo nhiều đơn hàng - mỗi chi nhánh 1 đơn
@@ -164,7 +191,8 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
         // Tính tổng tiền cho đơn hàng này
         final branchRentalFee = items.fold<double>(
           0,
-          (sum, item) => sum + (item.rentalPricePerDay * item.quantity * _rentalDays),
+          (sum, item) =>
+              sum + (item.rentalPricePerDay * item.quantity * _rentalDays),
         );
         final branchDeposit = items.fold<double>(
           0,
@@ -213,8 +241,12 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
 
       if (!mounted) return;
 
-      // Xóa giỏ hàng sau khi đặt thành công
-      await cartProvider.clearCart();
+      // Luồng chọn item từ giỏ: chỉ xóa item đã đặt.
+      if (_isDirectCheckout && widget.removeDirectItemsOnSuccess) {
+        await cartProvider.removeItems(bookingItems);
+      } else {
+        await cartProvider.clearCart();
+      }
 
       // Hiển thị thông báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
@@ -243,11 +275,11 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
   @override
   Widget build(BuildContext context) {
     final cartProvider = context.watch<CartProvider>();
-    final itemsByBranch = cartProvider.itemsByBranch;
-    
+    final itemsByBranch = _groupItemsByBranch(_effectiveItems(cartProvider));
+
     double totalRentalFee = 0;
     double totalDeposit = 0;
-    
+
     for (var items in itemsByBranch.values) {
       for (var item in items) {
         totalRentalFee += item.rentalPricePerDay * item.quantity * _rentalDays;
@@ -272,32 +304,58 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.location_on_rounded, color: AppColors.primary),
+                          Icon(
+                            Icons.location_on_rounded,
+                            color: AppColors.primary,
+                          ),
                           SizedBox(width: 8),
-                          Text('Địa chỉ nhận đồ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          Text(
+                            'Địa chỉ nhận đồ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
-                      Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 22),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textHint,
+                        size: 22,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   if (_hasReceiverInfo) ...[
-                    Text('$_receiverName  •  $_receiverPhone', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      '$_receiverName  •  $_receiverPhone',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 2),
-                    Text(_receiverAddress!, style: const TextStyle(color: AppColors.textSecondary)),
+                    Text(
+                      _receiverAddress!,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
                   ] else
-                    const Text('Chọn địa chỉ', style: TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.w500)),
+                    const Text(
+                      'Chọn địa chỉ',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Thông tin chi nhánh + sản phẩm
           ...itemsByBranch.entries.map((entry) {
             final items = entry.value;
             final branchName = items.first.branchName;
-            
+
             return Column(
               children: [
                 _SectionCard(
@@ -306,38 +364,82 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.storefront, size: 18, color: AppColors.primary),
+                          const Icon(
+                            Icons.storefront,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: 6),
-                          Text(branchName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          Text(
+                            branchName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      ...items.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(item.imageUrl, width: 64, height: 64, fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(width: 64, height: 64, color: AppColors.shimmerBase, child: const Icon(Icons.image_not_supported_rounded)),
+                      ...items.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  item.imageUrl,
+                                  width: 64,
+                                  height: 64,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 64,
+                                    height: 64,
+                                    color: AppColors.shimmerBase,
+                                    child: const Icon(
+                                      Icons.image_not_supported_rounded,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item.productName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 4),
-                                  Text('Size: ${item.selectedSize} | Màu: ${item.selectedColor}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                                  Text('SL: ${item.quantity} | ${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                                ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.productName,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Size: ${item.selectedSize} | Màu: ${item.selectedColor}',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      'SL: ${item.quantity} | ${AppConstants.formatPrice(item.rentalPricePerDay)}/ngày',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                     ],
                   ),
                 ),
@@ -345,52 +447,89 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
               ],
             );
           }),
-          
+
           // Thời gian thuê
           _SectionCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Thời gian thuê', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Thời gian thuê',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     const Icon(Icons.calendar_month_rounded, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('${_formatDate(_rentalRange.start)} - ${_formatDate(_rentalRange.end)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        '${_formatDate(_rentalRange.start)} - ${_formatDate(_rentalRange.end)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                     FilledButton(
                       onPressed: _pickRentalRange,
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.primary, visualDensity: VisualDensity.compact),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        visualDensity: VisualDensity.compact,
+                      ),
                       child: const Text('Chọn lịch'),
                     ),
                   ],
                 ),
-                Text('Tổng số ngày thuê: $_rentalDays ngày', style: const TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  'Tổng số ngày thuê: $_rentalDays ngày',
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Tổng tiền
           _SectionCard(
             child: Column(
               children: [
-                _PriceRow(label: 'Tổng phí thuê ($_rentalDays ngày)', value: AppConstants.formatPrice(totalRentalFee)),
-                _PriceRow(label: 'Tổng tiền đặt cọc', value: AppConstants.formatPrice(totalDeposit)),
+                _PriceRow(
+                  label: 'Tổng phí thuê ($_rentalDays ngày)',
+                  value: AppConstants.formatPrice(totalRentalFee),
+                ),
+                _PriceRow(
+                  label: 'Tổng tiền đặt cọc',
+                  value: AppConstants.formatPrice(totalDeposit),
+                ),
                 const Divider(height: 20),
-                _PriceRow(label: 'Tổng cộng', value: AppConstants.formatPrice(totalRentalFee + totalDeposit), isEmphasized: true),
+                _PriceRow(
+                  label: 'Tổng cộng',
+                  value: AppConstants.formatPrice(
+                    totalRentalFee + totalDeposit,
+                  ),
+                  isEmphasized: true,
+                ),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade700,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('Sẽ tạo ${itemsByBranch.length} đơn hàng riêng từ ${itemsByBranch.length} chi nhánh', style: TextStyle(fontSize: 12, color: Colors.blue.shade900)),
+                        child: Text(
+                          'Sẽ tạo ${itemsByBranch.length} đơn hàng riêng từ ${itemsByBranch.length} chi nhánh',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -411,8 +550,18 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Tổng cộng', style: TextStyle(color: AppColors.textSecondary)),
-                    Text(AppConstants.formatPrice(totalRentalFee + totalDeposit), style: const TextStyle(color: AppColors.primary, fontSize: 24, fontWeight: FontWeight.w800)),
+                    const Text(
+                      'Tổng cộng',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      AppConstants.formatPrice(totalRentalFee + totalDeposit),
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -420,10 +569,19 @@ class _MultiCartBookingScreenState extends State<MultiCartBookingScreen> {
               SizedBox(
                 height: 50,
                 child: FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
                   onPressed: _isSubmitting ? null : _submitOrders,
                   child: _isSubmitting
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : Text('Đặt ${itemsByBranch.length} đơn'),
                 ),
               ),
@@ -443,21 +601,33 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
       child: child,
     );
   }
 }
 
 class _ReceiverInfo {
-  const _ReceiverInfo({required this.name, required this.phone, required this.address});
+  const _ReceiverInfo({
+    required this.name,
+    required this.phone,
+    required this.address,
+  });
   final String name;
   final String phone;
   final String address;
 }
 
 class _AddressInputDialog extends StatefulWidget {
-  const _AddressInputDialog({this.initialName, this.initialPhone, this.initialAddress});
+  const _AddressInputDialog({
+    this.initialName,
+    this.initialPhone,
+    this.initialAddress,
+  });
   final String? initialName;
   final String? initialPhone;
   final String? initialAddress;
@@ -477,7 +647,9 @@ class _AddressInputDialogState extends State<_AddressInputDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName ?? '');
     _phoneController = TextEditingController(text: widget.initialPhone ?? '');
-    _addressController = TextEditingController(text: widget.initialAddress ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialAddress ?? '',
+    );
   }
 
   @override
@@ -490,7 +662,13 @@ class _AddressInputDialogState extends State<_AddressInputDialog> {
 
   void _save() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(context).pop(_ReceiverInfo(name: _nameController.text.trim(), phone: _phoneController.text.trim(), address: _addressController.text.trim()));
+    Navigator.of(context).pop(
+      _ReceiverInfo(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+      ),
+    );
   }
 
   @override
@@ -503,32 +681,80 @@ class _AddressInputDialogState extends State<_AddressInputDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(controller: _nameController, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Họ và tên'), validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập họ và tên' : null),
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Họ và tên'),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'Vui lòng nhập họ và tên'
+                    : null,
+              ),
               const SizedBox(height: 10),
-              TextFormField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Số điện thoại'), validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập số điện thoại' : null),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'Vui lòng nhập số điện thoại'
+                    : null,
+              ),
               const SizedBox(height: 10),
-              TextFormField(controller: _addressController, maxLines: 2, decoration: const InputDecoration(labelText: 'Địa chỉ nhận hàng', alignLabelWithHint: true), validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập địa chỉ nhận hàng' : null),
+              TextFormField(
+                controller: _addressController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Địa chỉ nhận hàng',
+                  alignLabelWithHint: true,
+                ),
+                validator: (v) => v == null || v.trim().isEmpty
+                    ? 'Vui lòng nhập địa chỉ nhận hàng'
+                    : null,
+              ),
             ],
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-        FilledButton(style: FilledButton.styleFrom(backgroundColor: AppColors.primary), onPressed: _save, child: const Text('Lưu')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          onPressed: _save,
+          child: const Text('Lưu'),
+        ),
       ],
     );
   }
 }
 
 class _PriceRow extends StatelessWidget {
-  const _PriceRow({required this.label, required this.value, this.isEmphasized = false});
+  const _PriceRow({
+    required this.label,
+    required this.value,
+    this.isEmphasized = false,
+  });
   final String label;
   final String value;
   final bool isEmphasized;
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(fontWeight: isEmphasized ? FontWeight.w700 : FontWeight.w500, color: isEmphasized ? AppColors.primary : AppColors.textPrimary, fontSize: isEmphasized ? 16 : 14);
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label), Text(value, style: style)]));
+    final style = TextStyle(
+      fontWeight: isEmphasized ? FontWeight.w700 : FontWeight.w500,
+      color: isEmphasized ? AppColors.primary : AppColors.textPrimary,
+      fontSize: isEmphasized ? 16 : 14,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(value, style: style),
+        ],
+      ),
+    );
   }
 }
