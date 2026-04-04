@@ -71,9 +71,11 @@ class _AuthGateState extends State<AuthGate> {
 
   bool _biometricVerified = false;
   String? _verifiedUserId;
+  bool _isRestoringSessionAfterBiometric = false;
   bool _postLoginBypassGranted = false;
   String? _postLoginBypassUid;
   bool _forceShowLoginFormWhenLoggedOut = false;
+  bool _skipBiometricOnceForAccountSwitch = false;
   bool _isSigningOutForDisabledBiometric = false;
 
   void _markBiometricVerified(String uid) {
@@ -133,6 +135,15 @@ class _AuthGateState extends State<AuthGate> {
 
         final userModel = userSnapshot.data;
 
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _biometricPreferenceService.saveRememberedUserProfile(
+            user,
+            displayNameOverride: userModel?.displayName,
+            avatarUrlOverride: userModel?.avatarUrl,
+            emailOverride: userModel?.email,
+          );
+        });
+
         // Nếu là admin thì vào AdminMainScreen
         if (userModel != null && userModel.isAdmin) {
           return const AdminMainScreen();
@@ -157,10 +168,18 @@ class _AuthGateState extends State<AuthGate> {
 
         final user = snapshot.data;
         if (user == null) {
-          _biometricVerified = false;
-          _verifiedUserId = null;
-          _postLoginBypassGranted = false;
-          _postLoginBypassUid = null;
+          if (_isRestoringSessionAfterBiometric) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          if (!_isRestoringSessionAfterBiometric) {
+            _biometricVerified = false;
+            _verifiedUserId = null;
+            _postLoginBypassGranted = false;
+            _postLoginBypassUid = null;
+          }
 
           if (_forceShowLoginFormWhenLoggedOut) {
             return const LoginScreen();
@@ -204,11 +223,28 @@ class _AuthGateState extends State<AuthGate> {
                     avatarUrl: remembered.avatarUrl,
                     email: remembered.email,
                     onVerified: () async {
+                      if (mounted) {
+                        setState(() {
+                          _isRestoringSessionAfterBiometric = true;
+                        });
+                      }
+
                       _markBiometricVerified(remembered.uid);
-                      await _authService.signInWithGoogle(
-                        forceAccountSelection: false,
-                        silentOnly: true,
-                      );
+                      try {
+                        await _authService.signInWithGoogle(
+                          forceAccountSelection: false,
+                          silentOnly: true,
+                        );
+                      } catch (_) {
+                        if (mounted) {
+                          setState(() {
+                            _isRestoringSessionAfterBiometric = false;
+                            _biometricVerified = false;
+                            _verifiedUserId = null;
+                          });
+                        }
+                        rethrow;
+                      }
                     },
                     onUseAnotherAccount: () async {
                       if (!mounted) {
@@ -216,6 +252,7 @@ class _AuthGateState extends State<AuthGate> {
                       }
                       setState(() {
                         _forceShowLoginFormWhenLoggedOut = true;
+                        _skipBiometricOnceForAccountSwitch = true;
                       });
                     },
                   );
@@ -226,12 +263,20 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         _forceShowLoginFormWhenLoggedOut = false;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _biometricPreferenceService.saveRememberedUserProfile(user);
-        });
+
+        if (_isRestoringSessionAfterBiometric) {
+          _biometricVerified = true;
+          _verifiedUserId = user.uid;
+          _isRestoringSessionAfterBiometric = false;
+        }
 
         final isVerifiedForCurrentUser =
             _biometricVerified && _verifiedUserId == user.uid;
+
+        if (_skipBiometricOnceForAccountSwitch) {
+          _skipBiometricOnceForAccountSwitch = false;
+          return _buildAuthorizedArea(user);
+        }
 
         return FutureBuilder<bool>(
           future: _biometricPreferenceService.isEnabledForUser(user.uid),
@@ -256,16 +301,30 @@ class _AuthGateState extends State<AuthGate> {
             }
 
             if (!isVerifiedForCurrentUser) {
-              return BiometricUnlockScreen(
-                displayName: user.displayName ?? user.email ?? 'Rentify User',
-                userUid: user.uid,
-                avatarUrl: user.photoURL,
-                email: user.email,
-                onVerified: () async {
-                  _markBiometricVerified(user.uid);
-                },
-                onUseAnotherAccount: () async {
-                  await _authService.signOut();
+              return FutureBuilder<UserModel?>(
+                future: _firebaseService.getUserById(user.uid),
+                builder: (context, profileSnapshot) {
+                  final profile = profileSnapshot.data;
+                  final displayName =
+                      profile?.displayName ??
+                      user.displayName ??
+                      user.email ??
+                      'Rentify User';
+                  final avatarUrl = profile?.avatarUrl ?? user.photoURL;
+                  final email = profile?.email ?? user.email;
+
+                  return BiometricUnlockScreen(
+                    displayName: displayName,
+                    userUid: user.uid,
+                    avatarUrl: avatarUrl,
+                    email: email,
+                    onVerified: () async {
+                      _markBiometricVerified(user.uid);
+                    },
+                    onUseAnotherAccount: () async {
+                      await _authService.signOut();
+                    },
+                  );
                 },
               );
             }

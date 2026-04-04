@@ -102,6 +102,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final result = await _biometricService.authenticateForLogin();
       if (result == BiometricAuthResult.verified) {
         await _biometricPreferenceService.setEnabledForUser(current.uid, true);
+        await _biometricPreferenceService.saveRememberedUserProfile(
+          current,
+          displayNameOverride: _user?.displayName,
+          avatarUrlOverride: _user?.avatarUrl,
+          emailOverride: _user?.email,
+        );
         if (!mounted) return;
         setState(() {
           _biometricLoginEnabled = true;
@@ -402,13 +408,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      final updatedDisplayName = nameController.text.trim();
+      final updatedPhoneNumber = phoneController.text.trim();
+      final updatedAvatarUrl = avatarController.text.trim();
+      final updatedAddress = addressController.text.trim();
+
       await _firebaseService.updateUser(current.uid, {
-        'displayName': nameController.text.trim(),
-        'phoneNumber': phoneController.text.trim(),
-        'avatarUrl': avatarController.text.trim(),
-        'address': addressController.text.trim(),
+        'displayName': updatedDisplayName,
+        'phoneNumber': updatedPhoneNumber,
+        'avatarUrl': updatedAvatarUrl,
+        'address': updatedAddress,
       });
-      await current.updateDisplayName(nameController.text.trim());
+      await current.updateDisplayName(updatedDisplayName);
+      await _biometricPreferenceService.saveRememberedUserProfile(
+        current,
+        displayNameOverride: updatedDisplayName,
+        avatarUrlOverride: updatedAvatarUrl,
+        emailOverride: user.email,
+      );
       await _loadProfile();
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -468,6 +485,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
+      final currentUser = _authService.currentUser;
+      if (currentUser != null) {
+        await _biometricPreferenceService.saveRememberedUserProfile(
+          currentUser,
+          displayNameOverride: _user?.displayName,
+          avatarUrlOverride: _user?.avatarUrl,
+          emailOverride: _user?.email,
+        );
+      }
+
       await _authService.signOut();
       if (!mounted) return;
       setState(() {

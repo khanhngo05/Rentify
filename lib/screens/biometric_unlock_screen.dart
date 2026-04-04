@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../constants/app_colors.dart';
@@ -109,11 +110,35 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                     CircleAvatar(
                       radius: 44,
                       backgroundColor: AppColors.surfaceVariant,
-                      backgroundImage: hasAvatar
-                          ? NetworkImage(avatarUrl)
-                          : null,
                       child: hasAvatar
-                          ? null
+                          ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: avatarUrl,
+                                width: 88,
+                                height: 88,
+                                fit: BoxFit.cover,
+                                fadeInDuration: const Duration(
+                                  milliseconds: 120,
+                                ),
+                                placeholder: (context, url) => const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Text(
+                                    avatarText,
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 30,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
                           : Text(
                               avatarText,
                               style: const TextStyle(
@@ -144,8 +169,8 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
+                      height: 54,
+                      child: ElevatedButton(
                         onPressed: _isVerifying ? null : _verifyBiometric,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -154,20 +179,32 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        icon: _isVerifying
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.fingerprint_rounded),
-                        label: Text(
-                          _isVerifying
-                              ? 'Đang xác thực...'
-                              : 'Xác thực Face ID / vân tay',
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _isVerifying
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.fingerprint_rounded,
+                                      size: 20,
+                                    ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _isVerifying
+                                    ? 'Đang xác thực...'
+                                    : 'Quét nhanh bằng FaceID/vân tay',
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
