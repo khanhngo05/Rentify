@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:provider/provider.dart'; // Phần bạn thêm: Import thư viện Provider
@@ -187,6 +188,10 @@ class _AuthGateState extends State<AuthGate> {
             _postLoginBypassUid = null;
           }
 
+          if (kIsWeb) {
+            return const LoginScreen();
+          }
+
           if (_forceShowLoginFormWhenLoggedOut) {
             return const LoginScreen();
           }
@@ -269,6 +274,10 @@ class _AuthGateState extends State<AuthGate> {
         }
 
         _forceShowLoginFormWhenLoggedOut = false;
+
+        if (kIsWeb) {
+          return _buildAuthorizedArea(user);
+        }
 
         if (_isRestoringSessionAfterBiometric) {
           _biometricVerified = true;

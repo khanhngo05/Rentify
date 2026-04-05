@@ -511,16 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final currentUser = _authService.currentUser;
-      if (currentUser != null) {
-        await _biometricPreferenceService.saveRememberedUserProfile(
-          currentUser,
-          displayNameOverride: _user?.displayName,
-          avatarUrlOverride: _user?.avatarUrl,
-          emailOverride: _user?.email,
-        );
-      }
-
+      await _biometricPreferenceService.clearRememberedUserProfile();
       await _authService.signOut();
       if (!mounted) return;
       setState(() {
