@@ -57,16 +57,35 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           color: Colors.white,
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Tổng: ${_filteredBranches.length} chi nhánh',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Tổng: ${_filteredBranches.length} chi nhánh',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: _addBranch,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Thêm'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 10),
               FilterChip(
                 label: Text(
                   'Đã đóng',
@@ -81,16 +100,6 @@ class _AdminBranchesScreenState extends State<AdminBranchesScreen> {
                 onSelected: (v) {
                   setState(() => _showInactive = v);
                 },
-              ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: _addBranch,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Thêm'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                ),
               ),
             ],
           ),
