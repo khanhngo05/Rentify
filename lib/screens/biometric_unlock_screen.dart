@@ -46,16 +46,24 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
       }
 
       if (result == BiometricAuthResult.verified) {
-        await widget.onVerified();
+        try {
+          await widget.onVerified();
+        } catch (_) {
+          _showMessage(
+            'Xác thực thành công nhưng không thể đăng nhập. Vui lòng thử lại.',
+          );
+        }
         return;
       }
 
       if (result == BiometricAuthResult.unavailable) {
-        _showMessage('Vui lòng kích hoạt Face ID.');
+        _showMessage(
+          'Thiết bị chưa sẵn sàng sinh trắc học. Vui lòng kiểm tra vân tay.',
+        );
         return;
       }
 
-      _showMessage('Xác thực Face ID thất bại.');
+      _showMessage('Xác thực vân tay không hợp lệ. Vui lòng thử lại.');
     } finally {
       if (mounted) {
         setState(() {
@@ -160,7 +168,7 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Đăng nhập nhanh bằng Face ID',
+                      'Đăng nhập nhanh bằng vân tay',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 14,
@@ -201,7 +209,7 @@ class _BiometricUnlockScreenState extends State<BiometricUnlockScreen> {
                               Text(
                                 _isVerifying
                                     ? 'Đang xác thực...'
-                                    : 'Quét nhanh bằng FaceID/vân tay',
+                                    : 'Quét vân tay để đăng nhập',
                               ),
                             ],
                           ),

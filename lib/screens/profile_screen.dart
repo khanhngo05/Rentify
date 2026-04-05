@@ -94,7 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _biometricLoginEnabled = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã tắt đăng nhập Face ID')),
+          const SnackBar(content: Text('Đã tắt đăng nhập vân tay')),
         );
         return;
       }
@@ -113,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _biometricLoginEnabled = true;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã bật đăng nhập Face ID')),
+          const SnackBar(content: Text('Đã bật đăng nhập vân tay')),
         );
         return;
       }
@@ -126,7 +126,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (result == BiometricAuthResult.unavailable) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Thiết bị chưa bật Face ID để sử dụng tính năng này'),
+            content: Text(
+              'Thiết bị chưa sẵn sàng vân tay để sử dụng tính năng này',
+            ),
           ),
         );
         return;
@@ -511,7 +513,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      await _biometricPreferenceService.clearRememberedUserProfile();
       await _authService.signOut();
       if (!mounted) return;
       setState(() {
@@ -618,7 +619,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Kích hoạt Faceid, vân tay',
+                          'Kích hoạt đăng nhập vân tay',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
